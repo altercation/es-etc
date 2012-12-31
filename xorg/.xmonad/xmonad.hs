@@ -15,6 +15,7 @@
 -- lots of others that i've forgotten to record here
 -- https://github.com/bogner/dotxmonad/blob/master/xmonad.hs - interesting float management
 -- serious submaps: http://www.haskell.org/haskellwiki/Xmonad/Config_archive/Regalia%27s_xmonad.hs
+-- sersiously modular: https://bitbucket.org/anekos/xmonad-conf/src/
 
 -- following has a solution for indicating that you are in a submap entry mode
 -- read again: https://bitbucket.org/00Davo/dotfiles/src/89908e98731ca0e029ddf5ab3cfd50e52b81b2ea/xmonad/xmonad.hs?at=default
@@ -95,6 +96,9 @@ import           XMonad.Util.NamedScratchpad
 import           XMonad.Util.Run
 import           XMonad.Util.WindowProperties
 
+import           XMonad.Layout.LayoutCombinators (JumpToLayout(..))
+import           XMonad.Actions.SpawnOn
+
 -- import        XMonad.Util.NamedActionsLocal
 -- import        XMonad.Util.Statusbars
 -- import        XMonad.Actions.Navigation2D
@@ -104,6 +108,8 @@ import           XMonad.Util.WindowProperties
 -- import        XMonad.Prompt.Ssh
 -- import        XMonad.Prompt.AppendFile
 -- import        Text.Regex.Posix ((=~))
+
+import XMonad.Hooks.SetWMName
 
 -- TODO: implement a preconfigured grid select for tablet mode
 -- implement normal gridselect
@@ -144,8 +150,12 @@ keysMainApps conf =
   (subtitle "MAIN APPS":) $ mkNamedKeymap conf $
   [("M-<Return>",    an "New terminal"           $ newTerminal)
   ,("M-S-<Return>",  an "Next open terminal"     $ nextTerminal)
-  ,("M4-<Return>",   an "New browser"            $ newBrowser)
-  ,("M4-S-<Return>", an "Next open browser"      $ nextBrowser)]
+  ,("M-\\",          an "New browser"            $ newBrowser)
+  ,("M-S-\\",        an "Next open browser"      $ nextBrowser)
+  ,("M-]",           an "New firefox"            $ newFirefox)
+  ,("M-S-]",         an "Next open firefox"      $ nextFirefox)
+  ,("M-[",           an "New minimal browser"    $ newMinimal)
+  ,("M-S-[",         an "Next open minimal browser" $ nextMinimal)]
 
 -- SECONDARY APPS KEYS -------------------------------------------------
 
@@ -154,10 +164,12 @@ keysSecondaryApps conf =
   [("M4-m",          an "Show mail"              $ showMail)
   ,("M4-y",          an "Show web music player"  $ showWebMusic)
   ,("M4-p",          an "Show web contacts"      $ showWebContacts)
-  ,("M4-S-c",        an "Show calendar"          $ showWebCalendar)
+  ,("M4-g c",        an "Show calendar"          $ showWebCalendar)
   ,("M4-t",          an "Show tasks"             $ showWebTasks)
   ,("M4-d",          an "Show Google drive"      $ showWebDrive)
   ,("M4-i",          an "Show Chat Drawer"       $ showChatDrawer)
+  ,("M4-a",          an "Anki Flash Cards"       $ flashCards)
+  ,("M4-z",          an "Zim wiki"               $ zimWiki)
   ,("M4-v",          an "New Vim"                $ newVim)
   ,("M4-S-v",        an "Next Vim"               $ nextVim)]
 
@@ -165,14 +177,14 @@ keysSecondaryApps conf =
 
 keysScratchpads conf =
   (subtitle "SCRATCHPADS":) $ mkNamedKeymap conf $
-  [("M4-n",          an "Persistent Notes"       $ togSP "notepad")
+  [("M4-f",          an "Filemanager"            $ togSP "filemanager")
+  ,("M4-n",          an "Persistent Notes"       $ togSP "notepad")
   ,("M4-x",          an "Audio Mixer"            $ togSP "mixer")
   ,("M4-h",          an "Process monitor"        $ togSP "htop")
   ,("M4-c",          an "Calendar - week"        $ togSP "calweek")
-  ,("M4-v",          an "Calendar - month"       $ togSP "calmonth")
+  ,("M4-S-c",        an "Calendar - month"       $ togSP "calmonth")
+  ,("M4-v",          an "Virtual Box Manager"    $ spawn "VirtualBox")
   ,("M4-w",          an "Wifi connection menu"   $ togSP "wifi")]
-  where
-    togSP sp = toggleScratchpad sp
 
 -- PROMPT KEYS ---------------------------------------------------------
 
@@ -197,8 +209,8 @@ keysKillQuit conf =
   [("M-" ++ bkSP,    an "Close focused"          $ kill1)
   ,("M-z",           an "Close focused"          $ unspawn "xmobar")
   ,("M-S-" ++ bkSP,  an "Close all"              $ killAll)
-  ,("M-q",           an "Rebuild XMonad"         $ rebuildXMonad)
-  ,("M-C-q",         an "Restart (only) XMonad"  $ restartXMonad)
+  ,("M-q",           an "Restart XMonad"         $ restartXMonad)
+  ,("M-C-q",         an "Rebuild XMonad"         $ rebuildXMonad)
   ,("M-S-q",         an "Quit XMonad"            $ quitXMonad)]
 
 -- WINDOW KEYS ---------------------------------------------------------
@@ -220,36 +232,37 @@ keysActionsWindows conf =
   ,("M-C-u",         an "Clear urgent status"    $ clearUrgents)
   ,("M-p",           an "Pin/unpin window"       $ togglePin)]
   where
-      goNextWindow = windows W.focusDown
-      goPrevWindow = windows W.focusUp
-      rotNextWindow = rotAllDown
-      rotPrevWindow = rotAllUp
-      moveNextWindow = windows W.swapDown
-      movePrevWindow = windows W.swapUp
-      -- goToMaster
-      moveToMaster = windows W.focusMaster
-      goToHistory = nextMatch History (return True)
-      swapMaster = windows W.swapMaster
-      moveToTiled = withFocused (windows . W.sink)
-      moveAllToTiled = sinkAll
-      togglePin = do
-          ws <- wsContainingCopies
-          if (null ws)
-              then windows copyToAll
-          else killAllOtherCopies
+    goNextWindow = windows W.focusDown
+    goPrevWindow = windows W.focusUp
+    rotNextWindow = rotAllDown
+    rotPrevWindow = rotAllUp
+    moveNextWindow = windows W.swapDown
+    movePrevWindow = windows W.swapUp
+    -- goToMaster
+    moveToMaster = windows W.focusMaster
+    goToHistory = nextMatch History (return True)
+    swapMaster = windows W.swapMaster
+    moveToTiled = withFocused (windows . W.sink)
+    moveAllToTiled = sinkAll
+    togglePin = do
+        ws <- wsContainingCopies
+        if (null ws)
+            then windows copyToAll
+        else killAllOtherCopies
 
 -- WORKSPACE KEYS ------------------------------------------------------
 -- X.A.CycleWS is doing the heavy lifting here http://goo.gl/jthn4
 
 keysActionsWS conf =
   (subtitle "WORKSPACE ACTIONS":) $ mkNamedKeymap conf $
-  [("M-l",           an "Next workspace"         $ goNextWS)
-  ,("M-h",           an "Previous workspace"     $ goPrevWS)
-  ,("M-S-l",         an "Move to next workspace" $ moveToNextWS)
-  ,("M-S-h",         an "Move to prev workspace" $ moveToPrevWS)
-  ,("M-C-l",         an "Send to next workspace" $ shiftToNext)
-  ,("M-C-h",         an "Send to prev workspace" $ shiftToPrev)
-  ,("M-S-o",         an "Jump to prev workspace" $ toggleWS)]
+  [("M-l",           an "Next workspace"           $ goNextWS)
+  ,("M-h",           an "Previous workspace"       $ goPrevWS)
+  ,("M-S-l",         an "Move to next workspace"   $ moveToNextWS)
+  ,("M-S-h",         an "Move to prev workspace"   $ moveToPrevWS)
+  ,("M-C-l",         an "Send to next workspace"   $ shiftToNext)
+  ,("M-C-h",         an "Send to prev workspace"   $ shiftToPrev)
+  ,("M-S-o",         an "Jump to prev workspace"   $ toggleWS)
+  ,("M-S-i", an "Move to workspace prompt" $ goToWSPrompt)]
   -- ,("M4-M1-w",    an "test"
   -- $ moveTo Next (WSTagGroup '.'))
   -- $ moveTo Next (WSIs $ return (('w' `elem`) . W.tag)))
@@ -257,22 +270,23 @@ keysActionsWS conf =
   -- , ((modm .|. controlMask, xK_t), 
   -- $ nextMatch History (className =? "XTerm"))
   where
-      goNextWS = moveTo Next NonEmptyWS
-      goPrevWS = moveTo Prev NonEmptyWS
-      moveToNextWS = shiftToNext >> nextWS
-      moveToPrevWS = shiftToPrev >> prevWS
---    moveNewWS
---        selectWorkspacePrompt = 
---            workspacePrompt myPromptConfig $ \w ->
---                do s <- gets windowset
---                    if W.tagMember w s
---                        then windows $ W.view w
---                    else DW.addWorkspace w
---    
---        curWorkspace :: X String
---        curWorkspace = withWindowSet (return . W.currentTag)
---        -- flashWS = (curWorkspace >>= \d->spawn $"flash "++d)
---        flashWS = return ()
+      goNextWS       = moveTo Next NonEmptyWS
+      goPrevWS       = moveTo Prev NonEmptyWS
+      moveToNextWS   = shiftToNext >> nextWS
+      moveToPrevWS   = shiftToPrev >> prevWS
+      goToWSPrompt   = workspacePrompt myPromptConfig $ \w ->
+                       do s <- gets windowset
+                          if W.tagMember w s
+                            then windows $ W.view w
+                            else DW.addWorkspace w
+--    moveToWSPrompt = workspacePrompt myPromptConfig $ \w ->
+--                     do s <- gets windowset
+--                        if W.tagMember w s
+--                          then withFocused $ W.shift w
+--                          else DW.addWorkspace w >> (withFocused $ W.shift w)
+--    curWorkspace :: X String
+--    curWorkspace = withWindowSet (return . W.currentTag)
+--    flashWS = (curWorkspace >>= \d->spawn $"flash "++d)
 
 keysActionsWSMap :: XConfig Layout -> [((KeyMask, KeySym), NamedAction)]
 keysActionsWSMap conf@(XConfig {XMonad.modMask = modm}) =
@@ -289,7 +303,7 @@ keysActionsWSMap conf@(XConfig {XMonad.modMask = modm}) =
 -- or limit layouts on a perworkspace basis
 keysActionsLayouts conf =
   (subtitle "LAYOUTS":) $ mkNamedKeymap conf $
-  [("M-<Space>",     an "Next layout"            $ cycleMainLayouts)
+  [("M-<Space>",     an "Next layout"            $ cycleAllLayouts)
   ,("M-S-<Space>",   an "Reset layout"           $ resetLayout conf)
   ,("M-C-<Space>",   an "Refresh layout"         $ refresh)
   ,("M-f",           an "Full screen"            $ fullScreen)
@@ -356,6 +370,7 @@ keysSystem conf =
   ,("S-" ++ btnDisp, an "Mirror display mode"    $ disp "mirror")
   ,("C-" ++ btnDisp, an "Span display mode"      $ disp "span")
   ,(btnBluetooth,    an "Bluetooth toggle"       $ togBT)
+  ,(btnTrackpad,     an "Trackpad toggle"        $ togTrackpad)
   ,(prtSc,           an "Screendraw start/stop"  $ draw "")
   ,("S-" ++ prtSc,   an "Screendraw force stop"  $ draw "finish")
   ,("M-" ++ prtSc,   an "Screendraw cancel"      $ draw "cancel")
@@ -364,12 +379,14 @@ keysSystem conf =
       -- note that my 'display' script will restart xmonad
       -- if required. could also do that here to make that
       -- script more window manager independent.
-      disp c         = spawn $ "display " ++ c
+      disp c         = spawn $ "displays " ++ c
       syst c         = spawn $ "system " ++ c
       togBT          = spawn $ "wireless bluetooth toggle"
+      togTrackpad    = spawn $ "trackpad toggle"
       draw c         = spawn $ "screendraw " ++ c
       btnDisp        = "<XF86Display>"
       btnLockScreen  = "<XF86ScreenSaver>"
+      btnTrackpad    = "<XF86TouchpadToggle>"
       btnSleep       = "<XF86Sleep>"
       btnPwr         = "<XF86PowerOff>"
       btnBluetooth   = "<XF86Launch1>"
@@ -463,6 +480,12 @@ newVim               = runInTerm "" "vim"
 nextVim              = raiseNextMaybe
                        (runInTerm "" "vim") (title =? "vim")
 
+flashCards           = raiseNextMaybe
+                       (spawn $ "anki") (className =? "Anki")
+
+zimWiki              = raiseNextMaybe
+                       (spawn $ "zim") (className =? "Zim")
+
 -- Open file in vim, relative to topic's directory
 -- from: http://goo.gl/8Rfkv
 -- vim :: String -> X ()
@@ -476,18 +499,28 @@ showMail             = raiseMaybe
 
 chromeClass          = "Chromium"
 chromeBase           = "chromium --memory-model=low"
-                     ++ "     --enable-print-preview"
                      ++ "     --enable-smooth-scrolling"
                      ++ "     --enable-sync-extensions"
                      ++ "     --enable-webgl"
                      ++ "     --ignore-gpu-blacklist"
+                     ++ "     --enable-print-preview"
 chrome               = chromeBase
                      ++ " --class=Chromium --name=chromium"
 
 newBrowser :: X ()
-newBrowser           = spawn $ chrome
+newBrowser           = spawnHere $ chrome
 nextBrowser          = raiseNextMaybe
-                       (spawn $ chrome) (className =? chromeClass)
+                       (spawnHere $ chrome) (className =? chromeClass)
+
+newFirefox :: X ()
+newFirefox           = spawnHere "firefox"
+nextFirefox          = raiseNextMaybe
+                       (spawnHere "firefox") (className =? "Firefox")
+
+newMinimal :: X ()
+newMinimal           = spawnHere "luakit"
+nextMinimal          = raiseNextMaybe
+                       (spawnHere "luakit") (className =? "luakit")
 
 showWebApp :: String -> String -> X ()
 showWebApp u m       = raiseNextMaybe
@@ -529,8 +562,12 @@ showWebNews          = showWebApp "https://reader.google.com"
 showWebTasks         = showWebApp "https://astrid.com"
                        "Astrid"
 
-showWebMusic         = showWebApp "https://play.google.com/music/listen"
-                       "Home - My Music"
+-- showWebMusic         = showWebApp "https://play.google.com/music/listen"
+--                        "Home - My Music"
+
+showWebMusic         = raiseNextMaybe
+                       (spawn "spotify &") 
+                       (className =? "Spotify")
 
 showWebVault         = showWebApp
                        ("chrome-extension://"
@@ -553,26 +590,42 @@ startCoreApps        = do
                        showMail
                        showWebVault
 
--- initSystemTray    :: X ()
-initSystemTray       = spawn   "systray &"
--- killSystemTray    :: X ()
+-- initSystemTray       :: X ()
+-- initSystemTray       = spawn   "stalonetray --background '#073642' --icon-size 18 --slot-size 20 --sticky --window-strut auto --window-type toolbar --geometry 6x1-1+0 --icon-gravity NE --kludges fix_window_pos,force_icons_size --dockapp-mode simple --window-layer bottom &"
+-- killSystemTray       :: X ()
+-- killSystemTray       = unspawn "stalonetray"
+
+initSystemTray       :: X ()
+initSystemTray       = spawn   "trayer --edge top --align right --SetDockType true --SetPartialStrut true --expand false --widthtype percent --width 6 --transparent true --tint 0x073642 --alpha 0 --margin 0 --padding 0 --heighttype pixel --height 20 &"
+killSystemTray       :: X ()
 killSystemTray       = unspawn "trayer"
 
--- initCompositor    :: X ()
-initCompositor       = spawn   "compton -f -D 6 -m 0.95 &"
--- killCompositor    :: X ()
+initCompositor    :: X ()
+initCompositor       = spawn   "compton -f -D 6 -m 0.95 --vsync drm --unredir-if-possible --detect-transient --detect-client-leader --use-ewmh-active-win --paint-on-overlay &"
+-- initCompositor       = spawn   "xcompmgr -f -D 6 &"
+-- initCompositor       = spawn   "cairo-compmgr &"
+-- initCompositor       = return ()
+killCompositor    :: X ()
 killCompositor       = unspawn "compton"
--- old xcompmgr command: "xcompmgr -f -D 6 &"
+-- killCompositor       = unspawn "xcompmgr"
+-- killCompositor       = unspawn "cairo-compmgr"
+-- killCompositor       = return ()
 
--- initNotifier      :: X ()
+initNotifier      :: X ()
 initNotifier         = spawn   "dunst &"
--- killNotifier      :: X ()
+killNotifier      :: X ()
 killNotifier         = unspawn "dunst"
 
--- initStatusBar     :: X ()
 initStatusBar        = spawn   "xmobar"
--- killStatusBar     :: X ()
 killStatusBar        = unspawn "xmobar"
+
+initAudioTray     :: X ()
+initAudioTray        = spawn   "pgrep pasystray || pasystray &"
+killAudioTray     :: X ()
+killAudioTray        = unspawn "pasystray"
+
+initFileManager :: X ()
+initFileManager      = spawn "pgrep spacefm || spacefm -d"
 
 flash :: String -> X ()
 flash s = spawn $ "flash "++ s
@@ -597,17 +650,18 @@ rebuildXMonad' = spawn $ "xmonad --recompile && xmonad --restart"
 
 restartXMonad' :: X ()
 restartXMonad' = spawn $ "xmonad --restart"
-               ++ " || warn 'XMonad restart failed'"
+               ++ " && notify 'XMonad restarted' || warn 'XMonad restart failed'"
 
 confStartupHook = do
     E.ewmhDesktopsStartup
     initSystemTray
     initCompositor
     initNotifier
-    -- initStatusBar
     initTerminal
+    -- initAudioTray
+    initFileManager
     spawn "bloop up"
-    notify "XMonad started"
+    -- notify "XMonad started"
 
 rebuildXMonad :: X ()
 rebuildXMonad = do
@@ -616,15 +670,16 @@ rebuildXMonad = do
     killSystemTray
     killCompositor
     killNotifier
+    killAudioTray
     rebuildXMonad'
 
 restartXMonad :: X ()
 restartXMonad = do
-    flash "restarting XMonad"
     killStatusBar
     killSystemTray
     killCompositor
     killNotifier
+    killAudioTray
     restartXMonad'
 
 quitXMonad = do
@@ -635,7 +690,7 @@ quitXMonad = do
 -- Scratch Pads
 ------------------------------------------------------------------------
 
-toggleScratchpad sp = namedScratchpadAction myScratchpads sp
+togSP sp = namedScratchpadAction myScratchpads sp
 
 spTerminal :: String -> String -> String -> String
 spTerminal f a c    = confTerminal
@@ -652,13 +707,19 @@ myScratchpads =
       (spTerminal myFont "-name wifi" "wifi")
       (resource =? "wifi") centSquare
 
+    , NS "filemanager"
+      "spacefm"
+      (className =? "Spacefm") nonFloating
+
     , NS "notepad"
       (spTerminal myFont "-name notepad" "vim")
       (resource =? "notepad") centSquare
 
     , NS "mixer"
-      (spTerminal myFontBig "" "alsamixer")
-      (title =? "alsamixer") centWinBig
+      "pavucontrol"
+      (className =? "Pavucontrol") centWinMax
+      -- (spTerminal myFontBig "" "alsamixer")
+      -- (title =? "alsamixer") centWinBig
 
     , NS "calweek"
       (spTerminal myFont
@@ -703,7 +764,7 @@ promptGotoWin = windowPromptGoto myPromptConfig
     }
 
 displayPrompt = inputPromptWithCompl promptConfig "Display Mode"
-    (mkComplFunFromList compList) ?+ \d -> spawn $ "display " ++ d
+    (mkComplFunFromList compList) ?+ \d -> spawn $ "displays " ++ d
         where
             promptConfig = myPromptConfig
                 { autoComplete = Nothing
@@ -793,64 +854,81 @@ fuzzySpawn = do
 
 
 ------------------------------------------------------------------------
--- Window management
+-- Manage windows
 ------------------------------------------------------------------------
 -- use xprop to id windows
 
--- cf http://www.haskell.org/haskellwiki/Xmonad/Config_archive/Marcot%27s_xmonad.hs
--- for a clean formatting example
-
+-- cf http://goo.gl/Ql7PG for a clean formatting example
 -- cf http://dotfiles.org/~jbromley/.xmonad/xmonad.hs
+-- cf http://goo.gl/gBuwu
 
-confManageHook = composeAll
-    [ isFullscreen --> doFullFloat
-    , className =? "MPlayer"        --> doFloat
-    , className =? "Gimp"           --> doFloat
-    , className =? "Skype"          --> doFloat
-    , className =? "Onboard"        --> doIgnore
-    , className =? "onboard"        --> doIgnore
-    , resource  =? "desktop_window" --> doIgnore
-    , resource  =? "kdesktop"       --> doIgnore
-    --, fullscreenManageHook
-    , manageDocks
-    ] <+> namedScratchpadManageHook myScratchpads
+confManageHook =   manageDocks
+               <+> namedScratchpadManageHook myScratchpads
+               -- <+> manageGimp
+               <+> manageGeneral
 
--- myManageHook = composeAll . concat $
---               [ [ isApp c                 --> doFloat     | c <- myFloatApps      ]
---               , [ isApp c <&&> title =? t --> doFloat     | (c, t) <- myFloatWins ]
---               , [ isApp c                 --> doIgnore    | c <- myIgnores        ]
---               --, [ title =? "googleearth-bin" --> doIgnore                        ]
---               , [ isFullscreen            --> doFullFloat                        ]
---               , [ isApp "gnome-mplayer" <&&> title =? "Gnome MPlayer Fullscreen"
---                                           --> doFullFloat                        ]
---               ]
---               where
---                 isApp c = className =? c <||> resource =? c
---                 myFloatApps = ["Pidgin"
---                               ,"skype"
---                               ,"xpad"
---                               ,"gimp"
---                               ,"gimp-2.6"
---                               ,"xfrun4"
---                               ,"grpn"
---                               ,"Melody Assistant"
---                               ,"Wine"
---                               ,"eclass-view-Main"
---                               ]
---                 myFloatWins = [("dia",        "Dia v0.97.1"            )
---                               ,("thunar",     "File Operation Progress")
---                               ,("mscore.real","MuseScore Startup"      )
---                               ,("gnucash",    "GnuCash"                )
---                               ,("gnucash",    "Select a Budget"        )
---                               ,("Iceweasel",  "Downloads"              )
---                               ,("Iceweasel",  "Password Required"      )
---                               ,("Icedove",    "Password Required"      )
---                               ,("claws-mail", "Error"                  )
---                               ]
---                 myIgnores   = ["Do"
---                               ,"synapse"
---                               ,"xfce4-notifyd"
---                               ]
+-- cf anekos' setup http://goo.gl/xjJ1l
+-- TODO: read every module that anekos has developed for their config
+-- they are all pretty much mind blowing and along the lines I'm
+-- thinking of
+
+manageGeneral :: ManageHook
+manageGeneral =
+    composeAll . concat $
+    [ [ matchCRT cr t --> doFloat     | (cr, t) <- appsFloatByCRT  ]
+    , [ matchCR  cr   --> doFloat     | cr      <- appsFloatByCR   ]
+    , [ matchC   c    --> doFloat     | c       <- appsFloatByC    ]
+    , [ matchR   c    --> doFloat     | c       <- appsFloatByR    ]
+    , [ matchT   t    --> doFloat     | t       <- appsFloatByT    ]
+    , [ matchC   c    --> doIgnore    | c       <- appsIgnoreByCR  ]
+    , [ isFullscreen  --> doFullFloat                              ]
+    -- , [ manageDocks ]
+    ] where
+    matchCRT s t = (className =? s <||> resource =? s) <&&> title =? t
+    matchCR  s   =  className =? s <||> resource =? s
+    matchC   s   =  className =? s
+    matchR   s   =  resource =? s
+    matchT   s   =  title =? s
+    appsFloatByCRT   = [("thunar","File Operation Progress")]
+    appsFloatByCR    = ["MPlayer","Gimp","Skype","Gloobus-preview"]
+    appsFloatByC     = []
+    appsFloatByR     = []
+    appsFloatByT     = []
+    appsIgnoreByCR   = ["Onboard","desktop_window","stalonetray"]
+    appsForWS1       = []
+    appsDrawerByT    = []
+    appsDrawersByCR  = []
+
+-- manageGimp :: ManageHook -- from: http://goo.gl/xjJ1l
+-- manageGimp =
+--     className =? "Gimp" --> (doNamedShift "gimp" <+> doJumpToLayout "Gimp")
+--     <+> composeOne
+--     [ stringProperty "WM_WINDOW_ROLE" =? "gimp-image-window"
+--        -?> doSink
+--     , stringProperty "WM_WINDOW_ROLE" =? "gimp-image-new"
+--        -?> doCenterFloat
+--     , stringProperty "WM_WINDOW_ROLE" =? "gimp-dock"
+--        -?> doSink
+--     , stringProperty "WM_WINDOW_ROLE" =? "gimp-toolbox"
+--        -?> doSink
+--     , stringProperty "WM_WINDOW_ROLE" =? "gimp-toolbox-color-dialog"
+--        -?> doBottomRightFloat
+--     , return True -?> doFloat ]
+-- 
+-- doSink :: ManageHook
+-- doSink = ask >>= doF . W.sink
+-- 
+-- doBottomRightFloat :: ManageHook
+-- doBottomRightFloat = ask
+--                      >>= \w -> doF . W.float w . position . snd
+--                      =<< liftX (floatLocation w)
+--   where position (W.RationalRect _ _ w h) = W.RationalRect (1-w) (1-h) w h
+-- 
+-- doJumpToLayout :: String -> ManageHook
+-- doJumpToLayout l = liftX (sendMessage $ JumpToLayout l) >>= idHook
+-- 
+-- doNamedShift :: WorkspaceId -> ManageHook
+-- doNamedShift n = liftX (addWorkspace n) >>= (doF . W.shift)
 
 
 ------------------------------------------------------------------------
@@ -873,7 +951,8 @@ confEventHook = E.ewmhDesktopsEventHook
 
 -- workspaces   = ["web", "irc", "code" ] ++ map show [4..9]
 -- confWorkspaces  = ["1","2","3","4","5","6","7","8","9"]
-confWorkspaces  = ["1","2","3","4","5","wrk.1","wrk.2","pow","abc"]
+-- confWorkspaces  = ["1","2","3","4","5","wrk.1","wrk.2","pow","abc"]
+confWorkspaces   = map show [1..9]
 
 -- irc, web, com, org, txt, wrk, img, dev, des
 -- consider topic spaces
@@ -991,10 +1070,11 @@ confWorkspaces  = ["1","2","3","4","5","wrk.1","wrk.2","pow","abc"]
 -- for clear formatting
 
 confLayoutHook  = id
-                $ avoidStruts
-                $ onWorkspaces ["exmaple","andanother"] (tabs ||| full ||| float)
-                $ allLayouts
-                where
+    $ avoidStruts
+    $ onWorkspaces ["example","andanother"]
+      (tabs ||| full ||| float)
+    $ (tabs ||| tiledX ||| tiledXNude ||| full)
+    where
 
     allLayouts  = tabs ||| tiledX ||| tiledXNude ||| full
     mainLayouts = tabs ||| tiledX
@@ -1252,7 +1332,8 @@ myPromptConfig = defaultXPConfig
 
 myPP = defaultPP
     { ppCurrent             = xmobarColor base02 blue . wrap " " " "
-    , ppTitle               = xmobarColor blue "" . shorten 40
+    -- , ppTitle            = xmobarColor blue "" . shorten 40
+    , ppTitle               = xmobarColor base02 blue . shorten 40 . wrap " " " "
     , ppVisible             = wrap "(" ")"
     , ppUrgent              = xmobarColor base02 yellow . wrap " " " "
     , ppHidden              = id
@@ -1270,7 +1351,7 @@ myPP = defaultPP
 
 confLogHook = do
     historyHook
-    fadeInactiveLogHook 0xbbbbbbbb
+    -- fadeInactiveLogHook 0xbbbbbbbb
     copies <- wsContainingCopies
     let check ws | ws `elem` copies = xmobarColor yellow base02 $ ws
                  | otherwise = ws

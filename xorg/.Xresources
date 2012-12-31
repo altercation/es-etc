@@ -117,9 +117,11 @@ Xcursor.theme: Neutral
 !!#define S_green         #719e07
 
 !!background S_base03
-*background:            #002b36
+!*background:            #002b36
+*background:            #839496
 !!foreground S_base0
-*foreground:            #839496
+!*foreground:            #839496
+*foreground:            #073642
 
 !!*fading:                20
 !!*fadeColor:             S_base03
@@ -217,8 +219,9 @@ urxvt*cursorUnderline:  true
 
 !! depth 32 should be specified on the command line for scratchpad terms
 urxvt*depth:            32
-urxvt*background:       [95]#002b36
-
+!urxvt*background:       [95]#002b36
+urxvt*background:       [100]#002b36
+urxvt*foreground:       [100]#839496
 
 XScreenSaver.mode:			random
 XScreenSaver.timeout:		        0:10:00

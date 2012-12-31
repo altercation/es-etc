@@ -3,7 +3,6 @@
 
 DEBUG=false
 
-
 # ---------------------------------------------------------------------
 # PLATFORM SPECIFIC ENVIRONMENT CONFIG
 # ---------------------------------------------------------------------
@@ -68,6 +67,7 @@ export XENVIRONMENT="$HOME/.Xresources"
 # ---------------------------------------------------------------------
 # initial bin relative to current directory
 export PATH="bin:/usr/local/bin:/usr/local/sbin:$PATH:$BIN_PATH:$CONF_PATH/bin:$SEC_PATH/bin"
+export PATH="$PATH:/usr/lib/xscreensaver"
 export PATH="$PATH:$HOME/.cabal/bin"
 
 # ---------------------------------------------------------------------
@@ -149,7 +149,7 @@ case $SHELLMODE in
 
         # start x if we're not root and on tty1 (e.g. default boot condition)
         # who needs a display manager?
-        Keychain_Prompt
+        # Keychain_Prompt
         if [[ $USER != "root" ]] && [[ `tty` = /dev/tty1 ]] && [[ -z "$DISPLAY" ]]; then
             # .Xauthority causes X startup failure every other login. I know 
             # how that sounds. .Xauthority, I do not like you.
@@ -161,7 +161,8 @@ case $SHELLMODE in
     ;;
     nonlogin)
         # normal shell & shell script state
-        Keychain_Prompt
+        # Keychain_Prompt
+        echo "NONLOGIN, $SHELLTYPE" | festival --tts
         $DEBUG && logger ">>>>>>>>>> SHELL MODE: nonlogin ($SHELLTYPE)" || true
     ;;
     *)  $DEBUG && logger ">>>>>>>>>> SHELL MODE: NOT DETECTED ($SHELLTYPE)" || true ;;

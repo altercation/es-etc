@@ -1,10 +1,11 @@
 Config  {
-          font     = "-*-terminus-medium-r-normal--14-*-*-*-*-*-*-*"
+        -- font     = "-*-terminus-medium-r-normal--14-*-*-*-*-*-*-*"
+          font     = "-*-terminus-medium-r-normal--12-*-*-*-*-*-*-*"
         , border        = NoBorder
         , bgColor       = "#073642"
         , borderColor   = "#073642"
         , fgColor       = "#657b83"
-        , position      = TopSize L 95 20
+        , position      = TopSize L 94 20
         , lowerOnStart  = True
         , hideOnStart   = False
         , persistent    = False
@@ -23,11 +24,12 @@ Config  {
                           , Run Com "mailcount" [] "mail" 200
                           , Run Memory ["-t","MEM <usedratio>%","-L","50","-H","75","-l","#657b83","-n","#93a1a1","-h","#dc322f"] 200
                           , Run CoreTemp ["-t", "<core0>°", "-L", "50", "-H", "65", "-l", "#657b83", "-n", "#93a1a1", "-h", "#dc322f"] 50
+                          , Run Kbd [("us(dvorak)", "DV"), ("us", "US"), ("gr(polytonic)", "GR")]
                           , Run XMonadLog
                           ]
         , sepChar       = "%"
         , alignSep      = "}{"
-        , template      = " %XMonadLog% }{ %wlan0wi%  %battery%  %cpu% %cpufreq% %disku%  %theDate%  %mail% %mailq%  %pwrmode%%tabmode% "
-        -- template      = " %StdinReader% }{ %wlan0wi%  %battery%  %cpu% %cpufreq% %coretemp%  %memory%  %swap%  %disku%  %theDate%  %mail% %mailq%  %pwrmode%%tabmode% "
+        , template      = " %XMonadLog% }{ %wlan0wi%  %battery%  %cpu% %cpufreq% %coretemp%  %memory%  %swap%  %disku%  %theDate%  %kbd%  %mail% %mailq%  %pwrmode%%tabmode% "
+        --, template      = " %StdinReader% }{ %wlan0wi%  %battery%  %cpu% %cpufreq% %coretemp%  %memory%  %swap%  %disku%  %theDate%  %mail% %mailq%  %pwrmode%%tabmode% "
         }
 

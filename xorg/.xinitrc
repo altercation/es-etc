@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # xrdb and dbus need to be handled here since we're not using a
 # desktop environment
 
@@ -9,14 +11,30 @@ xsetroot -cursor_name left_ptr
 xsetroot -solid "#002b36"
 hsetroot -solid "#002b36"
 unclutter -root -idle 1 &
-setxkbmap -option ctrl:nocaps
 xset -b # turn off pc-speaker
+xset -dpms # turn off dpms for now... not sure what xscreensaver will do with this
+setxkbmap -option ctrl:nocaps
+setxkbmap -layout "us, gr" -option "grp:sclk_toggle" -variant ",polytonic" # scroll-lock toggles keyboard layout
+#setxkbmap -layout "gr,us" -option "grp:alt_shift_toggle" -variant ",extended"
+
+# automatically turn off trackpad while typing
+# cf https://wiki.archlinux.org/index.php/Touchpad_Synaptics
+# TODO: not working??
+# syndaemon -t -k -i 2 -d &
 
 # D-Bus
-dbuslaunch="`which dbus-launch 2>/dev/null`"
-if [ -n "$dbuslaunch" ] && [ -x "$dbuslaunch" ] && [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
-  eval `$dbuslaunch --sh-syntax --exit-with-session`
-  eval `$dbuslaunch --auto-syntax`
+#dbuslaunch="`which dbus-launch 2>/dev/null`"
+#if [ -n "$dbuslaunch" ] && [ -x "$dbuslaunch" ] && [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
+#  eval `$dbuslaunch --sh-syntax --exit-with-session`
+#  eval `$dbuslaunch --auto-syntax`
+#fi
+
+# Source scripts in /etc/X11/xinit/xinitrc.d/
+if [ -d /etc/X11/xinit/xinitrc.d ]; then
+    for f in /etc/X11/xinit/xinitrc.d/*; do
+        [ -x "$f" ] && . "$f"
+    done
+    unset f
 fi
 
 # xsetwacom set "Wacom ISDv4 E6 Finger touch" Mode "Absolute"
@@ -46,15 +64,8 @@ _touch_id="$(xsetwacom --list devices | grep TOUCH | sed 's/^.*id:\s*\(\w*\)\W.*
 #xbindkeys -f /etc/X11/xinit/xbindkeysrc
 #xbindkeys -f $HOME/.xbindkeysrc -X :0
 
-_xmonad () {
-/usr/bin/xscreensaver -no-splash -no-capture-stderr &
-xmonad
-}
-
-_gnome () {
-exec ck-launch-session gnome-session
-}
-
+#compton &
 /usr/bin/system boot
 /usr/bin/xscreensaver -no-splash -no-capture-stderr &
+dropboxd &
 xmonad
