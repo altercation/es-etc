@@ -3,7 +3,6 @@
 -- es@ethanschoonover.com  /  @ethanschoonover  / http://ethanschoonover.com
 -- Available at: http://github.com/altercation/es-etc/
 
-
 -- IMPORTS --------------------------------------------------------- {{{
 
 -- `! sort -k1.18` in vim for a sort of these that ignores "qualified"
@@ -78,7 +77,6 @@ myNavigation2DConfig = defaultNavigation2DConfig
     }
 
 myConfig = defaultConfig {
-
     terminal            = myTerminal,
     focusFollowsMouse   = myFocusFollowsMouse,
     clickJustFocuses    = myClickJustFocuses,
@@ -87,10 +85,7 @@ myConfig = defaultConfig {
     workspaces          = myTopics,
     normalBorderColor   = myNormalBorderColor,
     focusedBorderColor  = myFocusedBorderColor,
-
-    -- keys             = myKeys,
     mouseBindings       = myMouseBindings,
-
     layoutHook          = myLayout,
     manageHook          = myManageHook,
     handleEventHook     = myEventHook,
@@ -383,8 +378,7 @@ keysWorkspaces conf =
     [("C-;",                addName "Go to workspace prompt"        $ gotoWSPrompt)
     ,("C-S-;",              addName "Send to workspace prompt"      $ shiftWSPrompt)
     ] where
-        -- gotoWSPrompt   = workspacePrompt myPromptConfig $ windows . W.greedyView
-        gotoWSPrompt   = workspacePrompt myPromptConfig $ windows . W.view
+        gotoWSPrompt   = workspacePrompt myPromptConfig $ windows . W.view  -- not W.greedyView
         shiftWSPrompt  = workspacePrompt myPromptConfig $ windows . W.shift
 
 keysScreens conf =
@@ -412,14 +406,15 @@ keysSecondaryApps conf =
 
     (subtitle "OTHER APPS/SCRATCHPADS":) $ mkNamedKeymap conf $
 
-    [("M-s",                addName "Spotify"                       $ spawn "spotify")
-    ,("M-f",                addName "Filemanager"                   $ toggle "filemanager")
-    ,("M-x",                addName "Audio Mixer"                   $ toggle "mixer")
-    ,("M-p",                addName "Process monitor"               $ toggle "htop")
-    ,("M-c",                addName "Calendar - week"               $ toggle "calweek")
-    ,("M-S-c",              addName "Calendar - month"              $ toggle "calmonth")
-    ,("M-v",                addName "Virtual Box Manager"           $ spawn "VirtualBox")
-    ,("M-w",                addName "Wifi connection menu"          $ toggle "wifi")
+    [("M-s",                addName "Spotify"                       $ toggleSP "spotify")
+    ,("M-f",                addName "Filemanager"                   $ toggleSP "filemanager")
+    ,("M-z",                addName "Zim wiki"                      $ toggleSP "wiki")
+    ,("M-x",                addName "Audio Mixer"                   $ toggleSP "mixer")
+    ,("M-p",                addName "Process monitor"               $ toggleSP "htop")
+    ,("M-c",                addName "Calendar - week"               $ toggleSP "calweek")
+    ,("M-S-c",              addName "Calendar - month"              $ toggleSP "calmonth")
+    ,("M-v",                addName "Virtual Box Manager"           $ spawn    "VirtualBox")
+    ,("M-w",                addName "Wifi connection menu"          $ toggleSP "wifi")
     ]
 
 keysRunPromptSubmap conf =
@@ -474,9 +469,6 @@ myMouseBindings (XConfig {XMonad.modMask = modm}) = M.fromList $
     ]
 
 -------------------------------------------------------------------- }}}
--- PROMPTS --------------------------------------------------------- {{{
-
--------------------------------------------------------------------- }}}
 -- APPS & SCRATCHPADS ---------------------------------------------- {{{
 
 -- TERMINAL -----------------------
@@ -517,7 +509,7 @@ nextBrowser          = raiseNextMaybe
 
 -- SCRATCHPADS --------------------
 
-toggle sp = namedScratchpadAction myScratchpads sp
+toggleSP sp = namedScratchpadAction myScratchpads sp
 
 spTerminal :: String -> String -> String -> String
 spTerminal f a c    = myTerminal
@@ -538,13 +530,21 @@ myScratchpads =
       "spacefm"
       (className =? "Spacefm") nonFloating
 
+    , NS "wiki"
+      "zim"
+      (className =? "Zim") nonFloating
+
+    , NS "spotify"
+      "spotify"
+      (className =? "Spotify") centWinBig
+
     , NS "notepad"
       (spTerminal myFont "-name notepad" "vim")
       (resource =? "notepad") centSquare
 
     , NS "mixer"
       "pavucontrol"
-      (className =? "Pavucontrol") centWinMax
+      (className =? "Pavucontrol") centWinBig
       -- (spTerminal myFontBig "" "alsamixer")
       -- (title =? "alsamixer") centWinBig
 
@@ -556,7 +556,7 @@ myScratchpads =
     , NS "calmonth"
       (spTerminal myFontSmall
       ("-name calmonth -cr " ++ show base03) "gcal view month")
-      (resource =? "calmonth") centWinMax
+      (resource =? "calmonth") centWinVBig
 
     ] where
 
@@ -569,8 +569,11 @@ myScratchpads =
         centWinBig  = (customFloating 
                       $ W.RationalRect (1/8) (1/8) (3/4) (3/4))
 
-        centWinMax  = (customFloating 
+        centWinVBig = (customFloating 
                       $ W.RationalRect (2/15) (1/20) (11/15) (9/10))
+
+        centWinMax  = (customFloating 
+                      $ W.RationalRect (0/1) (0/1) (1/1) (1/1))
 
         centWinThin = (customFloating 
                       $ W.RationalRect (1/30) (1/4) (28/30) (1/2))
@@ -849,6 +852,7 @@ myManageHook = composeAll
     , resource  =? "desktop_window" --> doIgnore
     , resource  =? "kdesktop"       --> doIgnore ]
     <+> manageDocks
+    <+> namedScratchpadManageHook myScratchpads
 
 -------------------------------------------------------------------- }}}
 -- OLD ------------------------------------------------------------- {{{
