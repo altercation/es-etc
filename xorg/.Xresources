@@ -185,6 +185,7 @@ urxvt.perl-ext-common:       default,matcher
 urxvt.urlLauncher:      chromium
 
 urxvt.matcher.button:   1
+urxvt.iso14755:      false	
 
 *scrollBar:             true
 *scrollBar_right:       true
@@ -219,8 +220,8 @@ urxvt*cursorUnderline:  true
 
 !! depth 32 should be specified on the command line for scratchpad terms
 urxvt*depth:            32
-!urxvt*background:       [95]#002b36
-urxvt*background:       [100]#002b36
+urxvt*background:       [90]#002b36
+!urxvt*background:       [100]#002b36
 urxvt*foreground:       [100]#839496
 
 XScreenSaver.mode:			random

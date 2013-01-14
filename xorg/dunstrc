@@ -97,14 +97,14 @@
     # xev might be helpful to find names for keys
 
     # close notification
-    close = ctrl+space
+    close = F9
 
     # close all notifications
-    close_all = ctrl+shift+space
+    close_all = shift+F9
 
     # redisplay last message(s)
     # On the US keyboard layout 'grave' is normally above TAB and left of '1'.
-    history = ctrl+grave
+    history = ctrl+F9
 
 [urgency_low]
     # IMPORTANT: colors have to be defined in quotation marks.

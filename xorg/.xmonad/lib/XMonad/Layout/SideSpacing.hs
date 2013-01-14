@@ -2,15 +2,14 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  XMonad.Layout.Spacing
--- Copyright   :  (c) Brent Yorgey
+-- Module      :  XMonad.Layout.SideSpacing
 -- License     :  BSD-style (see LICENSE)
 --
--- Maintainer  :  <byorgey@gmail.com>
 -- Stability   :  unstable
 -- Portability :  portable
 --
--- Add a configurable amount of space around windows.
+-- Add a configurable amount of space on side of windows.
+-- Modified from B.Yorgey's XMonad.Layout.Spacing module
 -----------------------------------------------------------------------------
 
 module XMonad.Layout.SideSpacing (
