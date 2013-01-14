@@ -335,6 +335,9 @@ myKeys c =
     ++ keysWorkspaces c
     ++ keysScreens c
     ++ keysLayouts c
+    ++ keysSystem c
+    ++ keysSystemCodes c
+--    ++ keysMedia c
 
 keysXmonad conf =
 
@@ -369,6 +372,10 @@ keysWindows conf =
     ,("C-S-<Right>",        addName "Swap right"                    $ windowSwap R True)
     ,("C-S-<Up>",           addName "Swap up"                       $ windowSwap U True)
     ,("C-S-<Down>",         addName "Swap down"                     $ windowSwap D True)
+
+    ,("C-m",                addName "Focus on master"               $ windows W.focusMaster)
+--    ,("C-S-m",              addName "Swap with master"              $ windows W.swapMaster)
+
     ]
 
 keysWorkspaces conf =
@@ -437,10 +444,10 @@ keysLayouts conf =
     [("C-'",                addName "Next layout"                   $ nextLayout)
     ,("C-S-'",              addName "Sink & refresh layout"         $ sinkAll >> refresh)
     ,("C-M-'",              addName "Sing & hard reset layout"      $ sinkReset)
-    ,("C-1",                addName "Layout: 1 window, tabs"        $ goLayout "Tabs")
-    ,("C-2",                addName "Layout: 2 up combo 1/2"        $ goLayout "Read/Write")
-    ,("C-3",                addName "Layout: 2 up combo 1/3"        $ goLayout "Read/Note")
-    ,("C-4",                addName "Layout: 4 up grid"             $ goLayout "Grid")
+    ,("C-M-1",              addName "Layout: 1 window, tabs"        $ goLayout "Tabs")
+    ,("C-M-2",              addName "Layout: 2 up combo 1/2"        $ goLayout "Read/Write")
+    ,("C-M-3",              addName "Layout: 2 up combo 1/3"        $ goLayout "Read/Note")
+    ,("C-M-4",              addName "Layout: 4 up grid"             $ goLayout "Grid")
     ,("C-M-f",              addName "Full Screen"                   $ fullScreen)
     ] where
         showStruts = sendMessage $ SetStruts [minBound .. maxBound] []
@@ -449,6 +456,57 @@ keysLayouts conf =
         sinkReset = sinkAll >> showStruts >> (setLayout $ XMonad.layoutHook conf) >> refresh
         goLayout l = (sendMessage $ (JumpToLayout l)) >> showStruts
         fullScreen = (sendMessage $ JumpToLayout "Maximum") >> hideStruts
+
+keysSystem conf =
+
+    (subtitle "SYSTEM KEYS":) $ mkNamedKeymap conf $
+    [("<XF86Sleep>",        addName "System sleep"          $ spawn "system sleep")
+    ,("<XF86PowerOff>",     addName "System power off"      $ spawn "system off")
+    ,("S-<XF86PowerOff>",   addName "System reboot"         $ spawn "system reboot")
+    ,("<XF86ScreenSaver>",  addName "Lock screen"           $ spawn "displays lock")
+    ,("<XF86Display>",      addName "Cycle display mode"    $ spawn "displays toggle")
+    ,("S-<XF86Display>",    addName "Mirror display mode"   $ spawn "displays mirror")
+    ,("M-<XF86Display>",    addName "Span display mode"     $ spawn "displays span")
+    ,("<XF86Launch1>",      addName "Bluetooth toggle"      $ spawn "wireless bluetooth toggle")
+    ,("<XF86TouchpadOn>",   addName "Trackpad toggle"       $ spawn "trackpad toggle")
+    ,("<Print>",            addName "Screendraw start/stop" $ spawn "screendraw")
+    ,("S-<Print>",          addName "Screendraw force stop" $ spawn "screendraw finish")
+    ,("M-<Print>",          addName "Screendraw cancel"     $ spawn "screendraw cancel")
+    ,("<XF86RotateWindows>", addName "Screendraw clear"     $ spawn "screendraw clear")
+    ]
+
+-- keysSystemCodes :: XConfig Layout -> [((KeyMask, KeySym), NamedAction)]
+keysSystemCodes conf =
+
+    [((0, btnBatt),                     addName "Toggle min/max power modes"    $ spawn "power toggle")
+    ,((0 .|. shiftMask, btnBatt),       addName "Toggle miv/mov power modes"    $ spawn "power toggle pinned")
+    , separator
+    , ((0 .|. controlMask, btnBatt),    addName "Auto power mode"               $ spawn "auto power mode")]
+    where
+        btnBatt      = 0x1008ff93
+        btnSuspend   = 0x1008ffa7
+
+keysMedia conf =
+
+    (subtitle "MEDIA KEYS":) $ mkNamedKeymap conf $
+    -- c.f. key names at http://goo.gl/KqOA6
+
+    [(volUpK,         addName"Volume up by 1"         $ volUp "1")
+    ,(volDnK,         addName"Volume down by 1"       $ volDn "1")
+    ,("S-" ++ volUpK, addName"Volume up by 10"        $ volUp "10")
+    ,("S-" ++ volDnK, addName"Volume down by 10"      $ volDn "10")
+    ,("C-" ++ volUpK, addName"Volume at 50%"          $ volMax)
+    ,("C-" ++ volDnK, addName"Volume at maximum"      $ volMid)
+    ,(volMtK,         addName"Volume mute toggle"     $ volTog)]
+    where
+        volUpK       = "<XF86AudioRaiseVolume>"
+        volDnK       = "<XF86AudioLowerVolume>"
+        volMtK       = "<XF86AudioMute>"
+        volUp i      = spawn $ "volume up "   ++ i
+        volDn i      = spawn $ "volume down " ++ i
+        volMax       = spawn $ "volume max"
+        volMid       = spawn $ "volume mid"
+        volTog       = spawn $ "volume toggle"
 
 -- Mouse bindings: default actions bound to mouse events
 --
@@ -536,7 +594,7 @@ myScratchpads =
 
     , NS "spotify"
       "spotify"
-      (className =? "Spotify") centWinBig
+      (className =? "Spotify") centWinVBig
 
     , NS "notepad"
       (spTerminal myFont "-name notepad" "vim")
@@ -570,7 +628,7 @@ myScratchpads =
                       $ W.RationalRect (1/8) (1/8) (3/4) (3/4))
 
         centWinVBig = (customFloating 
-                      $ W.RationalRect (2/15) (1/20) (11/15) (9/10))
+                      $ W.RationalRect (1/40) (1/20) (19/20) (9/10))
 
         centWinMax  = (customFloating 
                       $ W.RationalRect (0/1) (0/1) (1/1) (1/1))
@@ -735,7 +793,7 @@ myLayout = (fullscreenFloat . fullscreenFull) $ noBorders $ avoidStruts
                     -- such as man pages, etc.
 
         combotabsth = renamed [Replace "Read/Note"]
-                    $ combineTwoP (TwoPane 0.03 0.33) tabs tabs
+                    $ combineTwoP (TwoPane 0.03 0.66) tabs tabs
                     (ClassName browserClass `Or` ClassName "PDFViewer")
 
         maximum     = renamed [Replace "Maximum"]
