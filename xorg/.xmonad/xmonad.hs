@@ -13,7 +13,7 @@ import           Data.List                                      -- isInfixOf, et
 import qualified Data.Map as M                              -- basics
 import           Data.Monoid                                    -- basics
 import           System.Exit                                    -- basics
-import           XMonad                                         -- basics
+import           XMonad hiding ((|||))                          -- basics (hiding ||| for X.A.CycleSelected)
 import           XMonad.Actions.CopyWindow                      -- copy a window to multiple workspaces
 import           XMonad.Actions.CycleSelectedLayouts            -- cycle through subset of available layouts
 import           XMonad.Actions.CycleWS                         -- move to workspaces / screens
@@ -32,6 +32,7 @@ import           XMonad.Layout.SideSpacing                      -- customized ve
 import           XMonad.Layout.Simplest                         -- super simple, used for my tabbed layout
 import           XMonad.Layout.TabBarDecoration                 -- themes, decorated layouts
 import           XMonad.Layout.TabbedWindowSwitcherDecoration   -- window title bars (CUSTOM)
+import           XMonad.Layout.LayoutCombinators                -- JumpToLayout, support X.A.CycleSelectedLayouts
 import           XMonad.Prompt                                  -- general prompt module
 import           XMonad.Prompt.RunOrRaise                       -- run apps
 import qualified XMonad.StackSet as W                           -- basics
@@ -44,7 +45,7 @@ import           XMonad.Util.SpawnOnce                          -- startup, etc.
 import           XMonad.Prompt.Workspace                        -- prompt go to / shift to workspace
 import           XMonad.Actions.UpdatePointer                   -- cursor management, useful changing screens
 
-import           XMonad.Layout.WindowNavigation                 -- moving around in 2d space instead of stack
+-- import           XMonad.Layout.WindowNavigation                 -- moving around in 2d space instead of stack
 import           XMonad.Actions.Navigation2D                    -- moving around in 2d space instead of stack
 
 import           XMonad.Hooks.UrgencyHook                       -- visually alert urgency in status bar
@@ -52,6 +53,8 @@ import           XMonad.Hooks.UrgencyHook                       -- visually aler
 import           XMonad.Layout.Combo                            -- combine multiple layouts
 import           XMonad.Layout.ComboP                           -- combine layouts with designated master apps
 import           XMonad.Layout.TwoPane                          -- simple two pane layout used w/X.L.Combo(P)
+
+import           XMonad.Actions.TopicSpace                      -- workspaces with directories and actions
 
 -- TODO: research what i'm losing by not using ewmh
 -- import        XMonad.Hooks.EwmhDesktops                      -- standard window manager hints support
@@ -81,7 +84,7 @@ myConfig = defaultConfig {
     clickJustFocuses    = myClickJustFocuses,
     borderWidth         = myBorderWidth,
     modMask             = myModMask,
-    workspaces          = myWorkspaces,
+    workspaces          = myTopics,
     normalBorderColor   = myNormalBorderColor,
     focusedBorderColor  = myFocusedBorderColor,
 
@@ -186,15 +189,15 @@ altTileTheme = baseTheme
 
 myTabbedThemeWithImageButtons :: Theme
 myTabbedThemeWithImageButtons = tabTheme {
-      windowTitleIcons = [ (nullButton, CenterLeft 0),
-      (closeButton, CenterRight 6)]
-      }
+    windowTitleIcons = [ (nullButton, CenterLeft 0),
+        (closeButton, CenterRight 6)]
+        }
 
 myTiledThemeWithImageButtons :: Theme
 myTiledThemeWithImageButtons = tileTheme {
-      windowTitleIcons = [ (nullButton, CenterLeft 0),
-      (closeButton, CenterRight 6)]
-      }
+    windowTitleIcons = [ (nullButton, CenterLeft 0),
+        (closeButton, CenterRight 6)]
+        }
 --  windowTitleIcons = [ (menuButton, CenterLeft 6),
 --      (closeButton, CenterRight 6)]
 --      (maxiButton, CenterRight 18),
@@ -362,16 +365,6 @@ keysWindows conf =
     ,("C-S-h",              addName "MOVE other side of combo"      $ return ())
     ,("C-S-l",              addName "MOVE last active window"       $ return ())
 
-    ,("C-M-<Left>",         addName "Navigate left"                 $ sendMessage $ Go L)
-    ,("C-M-<Right>",        addName "Navigate right"                $ sendMessage $ Go R)
-    ,("C-M-<Up>",           addName "Navigate up"                   $ sendMessage $ Go U)
-    ,("C-M-<Down>",         addName "Navigate down"                 $ sendMessage $ Go D)
-
-    ,("C-M-S-<Left>",       addName "Navigate left"                 $ sendMessage $ Swap L)
-    ,("C-M-S-<Right>",      addName "Navigate right"                $ sendMessage $ Swap R)
-    ,("C-M-S-<Up>",         addName "Navigate up"                   $ sendMessage $ Swap U)
-    ,("C-M-S-<Down>",       addName "Navigate down"                 $ sendMessage $ Swap D)
-
     ,("C-<Left>",           addName "Go left"                       $ windowGo L True)
     ,("C-<Right>",          addName "Go right"                      $ windowGo R True)
     ,("C-<Up>",             addName "Go up"                         $ windowGo U True)
@@ -400,6 +393,7 @@ keysScreens conf =
 
     [("C-o",                addName "Focus to other screen"         $ goToOtherScreen)
     ,("C-S-o",              addName "Send window to other screen"   $ moveToOtherScreen)
+    ,("C-M-S-o",            addName "Swap workspace w/other screen" $ swapNextScreen)
     ] where
         moveCursor          = updatePointer (Relative 0.99 0.99) -- X.A.UpdatePointer
         goToOtherScreen     = nextScreen >> moveCursor
@@ -444,19 +438,22 @@ keysRunPromptSubmap conf =
 
 keysLayouts conf =
 
-    (subtitle "APPS/SCRATCHPADS":) $ mkNamedKeymap conf $
-    [("C-'",                addName "Next layout"                   $ sendMessage NextLayout)
-    ,("C-S-'",              addName "Reset layout"                  $ setLayout $ XMonad.layoutHook conf)
-    ,("C-M-'",              addName "Sink & Reset layout"           $ sinkReset)
-    ,("C-1",                addName "Layout: 1 window, tabs"        $ setLayout $ XMonad.layoutHook conf)
-    ,("C-2",                addName "Layout: 2 up combo 1/2"        $ setLayout $ XMonad.layoutHook conf)
-    ,("C-3",                addName "Layout: 2 up combo 1/3"        $ setLayout $ XMonad.layoutHook conf)
-    ,("C-4",                addName "Layout: 4 up grid"             $ setLayout $ XMonad.layoutHook conf)
+    (subtitle "LAYOUTS":) $ mkNamedKeymap conf $
+    [("C-'",                addName "Next layout"                   $ nextLayout)
+    ,("C-S-'",              addName "Sink & refresh layout"         $ sinkAll >> refresh)
+    ,("C-M-'",              addName "Sing & hard reset layout"      $ sinkReset)
+    ,("C-1",                addName "Layout: 1 window, tabs"        $ goLayout "Tabs")
+    ,("C-2",                addName "Layout: 2 up combo 1/2"        $ goLayout "Read/Write")
+    ,("C-3",                addName "Layout: 2 up combo 1/3"        $ goLayout "Read/Note")
+    ,("C-4",                addName "Layout: 4 up grid"             $ goLayout "Grid")
+    ,("C-M-f",              addName "Full Screen"                   $ fullScreen)
     ] where
-        sinkReset = do
-            sinkAll
-            sendMessage NextLayout -- ugly but otherwise window draw refresh doesn't work
-            setLayout $ XMonad.layoutHook conf
+        showStruts = sendMessage $ SetStruts [minBound .. maxBound] []
+        hideStruts = sendMessage $ SetStruts [] [minBound .. maxBound]
+        nextLayout = sendMessage NextLayout >> showStruts
+        sinkReset = sinkAll >> showStruts >> (setLayout $ XMonad.layoutHook conf) >> refresh
+        goLayout l = (sendMessage $ (JumpToLayout l)) >> showStruts
+        fullScreen = (sendMessage $ JumpToLayout "Maximum") >> hideStruts
 
 -- Mouse bindings: default actions bound to mouse events
 --
@@ -714,9 +711,9 @@ myEventHook = fullscreenEventHook <+> docksEventHook
 -- The available layouts.  Note that each layout is separated by |||,
 -- which denotes layout choice.
 
-myLayout = (fullscreenFloat . fullscreenFull) $ noBorders $ avoidStruts $ windowNavigation
+myLayout = (fullscreenFloat . fullscreenFull) $ noBorders $ avoidStruts
 
-    $ tabs ||| borderTabs ||| combotabs ||| combotabsth ||| Mirror tiled ||| smartFull
+    $ tabs ||| combotabs ||| combotabsth ||| Mirror tiled ||| maximum
 
     where
 
@@ -725,23 +722,21 @@ myLayout = (fullscreenFloat . fullscreenFull) $ noBorders $ avoidStruts $ window
         tabs        = renamed [Replace "Tabs"] 
                     $ spacing 1 $ dragTabs $ noBorders $ Simplest
 
-        borderTabs  = renamed [Replace "Border Tabs"] 
-                    $ spacing 1 $ dragTabs $ Simplest
-
         simpleTabs  = renamed [Replace "Simple Tabbed"] 
                     $ addTabs $ noBorders $ Simplest
 
         combotabs   = renamed [Replace "Read/Write"]
-                    $ combineTwoP (TwoPane 0.03 0.5) borderTabs borderTabs
+                    $ combineTwoP (TwoPane 0.03 0.5) tabs tabs
                     (ClassName browserClass `Or` ClassName "PDFViewer")
                     -- TODO: add other common source/reference items here,
                     -- such as man pages, etc.
 
         combotabsth = renamed [Replace "Read/Note"]
-                    $ combineTwoP (TwoPane 0.03 0.33) borderTabs borderTabs
+                    $ combineTwoP (TwoPane 0.03 0.33) tabs tabs
                     (ClassName browserClass `Or` ClassName "PDFViewer")
 
-        smartFull   = noBorders $ Full
+        maximum     = renamed [Replace "Maximum"]
+                    $ noBorders $ Full
 
         -- addTabs uses the official X.L.TabBarDecoration
         addTabs  l  = tabBar shrinkText tabTheme Top 
@@ -770,7 +765,68 @@ myLayout = (fullscreenFloat . fullscreenFull) $ noBorders $ avoidStruts $ window
 -- workspace name. The number of workspaces is determined by the length
 -- of this list.
 
-myWorkspaces    = ["1","2","3","4","5","6","7","8","9"]
+myTopics :: [Topic]
+myTopics =
+    ["com"
+    ,"des"
+    ,"gen"
+    ,"irc"
+    ,"org"
+    ,"pro"
+    ,"sys"
+    ,"twt"
+    ,"txt"
+    ,"vid" -- av vid aud med
+    ,"web"
+    ]
+
+myTopicConfig :: TopicConfig
+myTopicConfig = defaultTopicConfig
+    { topicDirs = M.fromList $
+    [ ("gen", "")
+    , ("sys", "")
+    , ("wrk.smt", "wrk/smt")
+    , ("wrk.rws", "wrk/web/rws")
+    ]
+    , defaultTopicAction = const $ spawnShell >*> 3
+    , defaultTopic = "dashboard"
+    , topicActions = M.fromList $
+        [ ("conf",       spawnShell >> spawnShellIn "wd/ertai/private")
+        , ("darcs",      spawnShell >*> 3)
+        , ("yi",         spawnShell >*> 3)
+        , ("haskell",    spawnShell >*> 2 >> spawnShellIn "wd/dev-haskell/ghc")
+        , ("xmonad",     spawnShellIn "wd/x11-wm/xmonad" >>
+                         spawnShellIn "wd/x11-wm/xmonad/contrib" >>
+                         spawnShellIn "wd/x11-wm/xmonad/utils" >>
+                         spawnShellIn ".xmonad" >>
+                         spawnShellIn ".xmonad")
+        , ("irc",        spawn "weechat")
+        , ("com",        return ()) -- offlineimap >> showMail) 
+        , ("dashboard",  spawnShell)
+        , ("twitter",    spawnShell)
+        , ("web",        newBrowser)
+        , ("sys",        spawnShell)
+        , ("movie",      spawnShell)
+        , ("documents",  spawnShell >*> 2 >>
+                         spawnShellIn "Documents" >*> 2)
+        ]
+   }
+
+spawnShell :: X ()
+spawnShell = currentTopicDir myTopicConfig >>= spawnShellIn
+
+spawnShellIn :: Dir -> X ()
+spawnShellIn dir = spawn $ "urxvtc '(cd ''" ++ dir ++ "'' && " ++ myShell ++ " )'"
+
+goto :: Topic -> X ()
+goto = switchTopic myTopicConfig
+
+promptedGoto :: X ()
+promptedGoto = workspacePrompt myPromptConfig goto
+
+promptedShift :: X ()
+promptedShift = workspacePrompt myPromptConfig $ windows . W.shift
+
 
 -------------------------------------------------------------------- }}}
 -- WINDOW MANAGEMENT ----------------------------------------------- {{{
