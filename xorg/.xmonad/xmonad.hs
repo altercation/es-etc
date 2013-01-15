@@ -162,12 +162,20 @@ baseTheme = defaultTheme
     , decoHeight            = 22
     }
 
-tabTheme :: Theme
-tabTheme = baseTheme
+tabThemeDim :: Theme
+tabThemeDim = baseTheme
     { -- base00, base01, blue all good activeColors
       activeColor           = base03
     , activeBorderColor     = base03
     , activeTextColor       = base01
+    }
+
+tabTheme :: Theme
+tabTheme = baseTheme
+    { -- base00, base01, blue all good activeColors
+      activeColor           = blue
+    , activeBorderColor     = base03 
+    , activeTextColor       = base03
     }
 
 tileTheme :: Theme
@@ -286,6 +294,7 @@ myPromptConfig = defaultXPConfig
     , promptBorderWidth     = 1
     , height                = 22
     , autoComplete          = Just 100
+    -- default false? , showCompletionOnTab   = True     
     , searchPredicate = isInfixOf . (map toLower)
     , promptKeymap          = M.fromList
                               [((controlMask, xK_space), quit)]
@@ -319,7 +328,7 @@ myPP = defaultPP
 
 myLogHook = do
     historyHook -- used for history navigation from X.A.GroupNavigation
-    fadeInactiveCurrentWSLogHook 0xccccdddd -- 0xbbbbbbbb
+    -- fadeInactiveCurrentWSLogHook 0xccccdddd -- 0xbbbbbbbb
     copies <- wsContainingCopies -- from XMonad.Actions.CopyWindow
     let check ws | ws `elem` copies = xmobarColor yellow base02 $ ws
                  | otherwise = ws
@@ -810,24 +819,30 @@ myEventHook = fullscreenEventHook <+> docksEventHook
 -- a "cycle layouts" set on a per workspace basis.
 -- however this would not solve the initial state problem.
 
-myLayout = onWorkspaces ["com"] mailCall
+myLayout = avoidStruts
+     $ onWorkspaces ["com"] (mailCall)
 	 $ onWorkspaces ["sys","pro"] (readWrite ||| tabsD)
-         $ avoidStruts (tabsD ||| tileTall ||| tileWide ||| readWrite ||| maximum)
+     $ tabsD ||| tileTall ||| tileWide ||| readWrite ||| maximum
     where
-        tileTall    = renamed [Replace "Tiled Tall"] $ avoidStruts $ (Tall nmaster delta halves)
-        tileWide    = renamed [Replace "Tiled Wide"] $ avoidStruts $ (Mirror $ Tall nmaster delta halves)
-        readWrite   = renamed [Replace "Read Write"] $ avoidStruts $ (combineTwoP (TwoPane 0.03 0.5) tabs tabs (ClassName browserClass `Or` ClassName "PDFViewer"))
-        tabs        = renamed [Replace "Tabs"]       $ avoidStruts $ spacing 1 $ addTabs $ Simplest
-        tabsD       = renamed [Replace "TabsD"]      $ avoidStruts $ spacing 1 $ addTabsD $ Simplest
+        tileTall    = renamed [Replace "Tiled Tall"] $ (Tall nmaster delta halves)
+        tileWide    = renamed [Replace "Tiled Wide"] $ (Mirror $ Tall nmaster delta halves)
+        readWrite   = renamed [Replace "Read Write"] $ 
+                      combineTwoP (TwoPane 0.03 0.5) tabsD tabsD
+                      (ClassName browserClass `Or` ClassName "PDFViewer")
+        -- tabs        = renamed [Replace "Tabs"]       $ addTabs $ Simplest
+        -- addTabs l   = spacing 1 $ tabBar shrinkText tabTheme Top 
+        --               $ resizeVertical (fi $ decoHeight tabTheme) $ l
+                      -- w/normal X.L.TabBarDecoration
+        tabsD       = renamed [Replace "TabsD"]      $ addTabsD $ Simplest
+        addTabsD l  = spacing 1 $ tabbedWindowSwitcherDecorationWithImageButtons 
+                      shrinkText myTabbedThemeWithImageButtons (draggingVisualizer $ l)
         maximum     = renamed [Replace "Maximum"]    $ Full
-        mailCall    = renamed [Replace "Mail Call"]  $ avoidStruts $ drawer `onLeft` tabsD
+        mailCall    = renamed [Replace "Mail Call"]  $ drawer `onLeft` tabsD
         drawer      = simpleDrawer 0.0 0.3 (ClassName "Zim")
         nmaster     = 1      -- default num of windows in master pane
         halves      = 1/2    -- proportion of screen for master pane
         thirds      = 1/3    -- proportion of screen for master pane
         delta       = 3/100  -- increment % of scrn when resizing panes
-        addTabs l   = tabBar shrinkText tabTheme Top $ resizeVertical (fi $ decoHeight tabTheme) $ l -- w/normal X.L.TabBarDecoration
-        addTabsD l  = tabbedWindowSwitcherDecorationWithImageButtons shrinkText myTabbedThemeWithImageButtons (draggingVisualizer $ l)
 
 -- myLayout = avoidStruts (tabs ||| rwtabtab ||| rwtabtab3 ||| tileTall ||| maximum)
 --     where

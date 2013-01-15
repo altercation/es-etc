@@ -7,12 +7,14 @@
 -- License     :  BSD3-style (see LICENSE)
 --
 -- Modified    :  es@ethanschoonover.com
--- Maintainer  :  jan.vornberger@informatik.uni-oldenburg.de
 -- Stability   :  unstable
 -- Portability :  not portable
 --
 -- A decoration that allows to switch the position of windows by dragging
 -- them onto each other.
+--
+-- Modded from :  XMonad.Layout.WindowSwitcherDecoration
+--                by jan.vornberger@informatik.uni-oldenburg.de
 --
 -----------------------------------------------------------------------------
 
