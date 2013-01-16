@@ -11,8 +11,9 @@ import           Data.Char                                      -- toLower, et a
 import           Data.List                                      -- isInfixOf, et al
 import qualified Data.Map as M                                  -- basics
 import           Data.Monoid                                    -- basics
--- import           Data.Maybe                                     -- isJust (see workspace keybindings)
+import           System.Directory                               -- for killall prompt, et al
 import           System.Exit                                    -- basics
+import           System.IO                                      -- for killall prompt, et al
 import           XMonad hiding ((|||))                          -- basics (hiding ||| for X.A.CycleSelected)
 import           XMonad.Actions.CopyWindow                      -- copy a window to multiple workspaces
 import           XMonad.Actions.CycleSelectedLayouts            -- cycle through subset of available layouts
@@ -25,12 +26,14 @@ import           XMonad.Actions.WindowGo                        -- raising/going
 import           XMonad.Actions.WithAll                         -- actions on multiple windows (killAll, etc.)
 import           XMonad.Hooks.DynamicLog                        -- support for "untethered" xmobar
 import           XMonad.Hooks.FadeInactive                      -- fade out windows that aren't currently active
+import           XMonad.Hooks.InsertPosition                    -- config where new windows insert
 import           XMonad.Hooks.ManageDocks                       -- avoid statusbar/systray
 import           XMonad.Hooks.UrgencyHook                       -- visually alert urgency in status bar
 import           XMonad.Layout.Combo                            -- combine multiple layouts
 import           XMonad.Layout.ComboP                           -- combine layouts with designated master apps
 import           XMonad.Layout.Decoration                       -- themes, decorated layouts
 import           XMonad.Layout.DraggingVisualizer               -- see windows when dragging them
+import           XMonad.Layout.Drawer                           -- used for mail layout
 import           XMonad.Layout.Fullscreen                       -- fullscreen mgmt
 import           XMonad.Layout.LayoutCombinators                -- JumpToLayout, support X.A.CycleSelectedLayouts
 import           XMonad.Layout.NoBorders                        -- useful with fullscreen windows
@@ -42,7 +45,9 @@ import           XMonad.Layout.TabBarDecoration                 -- themes, decor
 import           XMonad.Layout.TabbedWindowSwitcherDecoration   -- window title bars (CUSTOM)
 import           XMonad.Layout.TwoPane                          -- simple two pane layout used w/X.L.Combo(P)
 import           XMonad.Prompt                                  -- general prompt module
+import           XMonad.Prompt.Input                            -- using for killall prompt, et al
 import           XMonad.Prompt.RunOrRaise                       -- run apps
+import           XMonad.Prompt.Shell                            -- shell prompt, natch
 import           XMonad.Prompt.Workspace                        -- prompt go to / shift to workspace
 import qualified XMonad.StackSet as W                           -- basics
 import           XMonad.Util.EZConfig                           -- clean keybindings
@@ -50,14 +55,10 @@ import           XMonad.Util.Image                              -- for window de
 import           XMonad.Util.NamedActions                       -- self documenting keybindings (CUSTOM)
 import           XMonad.Util.NamedScratchpad                    -- summon/dismiss running app windows
 import           XMonad.Util.SpawnOnce                          -- startup, etc.
-
--- import       XMonad.Layout.Master               -- abusing this for tabs test
-
-import           XMonad.Layout.OneBig                           -- used for touchscreen magic focus layout
-import           XMonad.Layout.MagicFocus                       -- used for touchscreen magic focus layout
-import           XMonad.Layout.Drawer                           -- used for mail layout
-
 import           XMonad.Util.WorkspaceCompare                   -- see workspace keybinding cycling below
+
+import           XMonad.Layout.Square                           -- used for combo layouts
+import           XMonad.Layout.Reflect                          -- used for combo layouts
 
 -- TODO: research what i'm losing by not using ewmh
 -- import        XMonad.Hooks.EwmhDesktops                      -- standard window manager hints support
@@ -118,6 +119,10 @@ blue    = "#268bd2"
 cyan    = "#2aa198"
 green   = "#719e07"
 
+-- 'active' value changes the entire highlight "theme"
+-- including xmobar, window/tab drag bars, prompts, etc.
+active  = blue
+
 -- Whether focus follows the mouse pointer.
 myFocusFollowsMouse :: Bool
 myFocusFollowsMouse = False
@@ -128,8 +133,9 @@ myClickJustFocuses = False
 
 myBorderWidth = 0
 
-myNormalBorderColor       = base03
-myFocusedBorderColor      = base01
+-- bug in compositing? #000000 ends up transparent, which is nice
+myNormalBorderColor       = "#000000"
+myFocusedBorderColor      = base03  
 
 myFontSize s                = "-*-terminus-medium-r-normal--" 
                               ++ show s ++ "-*-*-*-*-*-*-*"
@@ -173,7 +179,7 @@ tabThemeDim = baseTheme
 tabTheme :: Theme
 tabTheme = baseTheme
     { -- base00, base01, blue all good activeColors
-      activeColor           = blue
+      activeColor           = active
     , activeBorderColor     = base03 
     , activeTextColor       = base03
     }
@@ -189,8 +195,8 @@ tileTheme = baseTheme
 altTileTheme :: Theme
 altTileTheme = baseTheme
     { -- base00, base01, blue all good activeColors
-      activeColor           = blue
-    , activeBorderColor     = blue
+      activeColor           = active
+    , activeBorderColor     = active
     , activeTextColor       = base03
     }
 
@@ -283,22 +289,37 @@ closeButton' = [[0,0,0,0,0,0,0,0,0,0],
 closeButton :: [[Bool]]
 closeButton = convertToBool closeButton' 
 
-myPromptConfig :: XPConfig
-myPromptConfig = defaultXPConfig
-    { font                  = myFontBig
-    , bgColor               = base02
-    , fgColor               = base0
-    , fgHLight              = base03
-    , bgHLight              = blue
-    , borderColor           = base03
-    , promptBorderWidth     = 1
-    , height                = 22
-    , autoComplete          = Just 100
+myPromptConfig = basePromptConfig
+    {font               = myFontBig
+    ,bgColor            = active
+    ,fgColor            = base03
+    ,fgHLight           = active
+    ,bgHLight           = base03
+    ,borderColor        = active}
+
+basePromptConfig :: XPConfig
+basePromptConfig = defaultXPConfig
+    {font               = myFontBig
+    ,bgColor            = base02
+    ,fgColor            = base0
+    ,fgHLight           = base03
+    ,bgHLight           = active
+    ,borderColor        = base03
+    ,promptBorderWidth  = 1
+    ,height             = 22
+    ,autoComplete       = Just 100
     -- default false? , showCompletionOnTab   = True     
-    , searchPredicate = isInfixOf . (map toLower)
-    , promptKeymap          = M.fromList
-                              [((controlMask, xK_space), quit)]
-                             `M.union` promptKeymap defaultXPConfig
+    ,searchPredicate    = isInfixOf . (map toLower)
+    ,promptKeymap       = M.fromList
+                            [((controlMask, xK_space), quit)
+                            ,((controlMask, xK_h), quit)
+                            ,((controlMask, xK_j), quit)
+                            ,((controlMask, xK_k), quit)
+                            ,((controlMask, xK_l), quit)
+                            ,((controlMask, xK_semicolon), quit)
+                            ,((controlMask, xK_apostrophe), quit)
+                            ,((mod1Mask .|. controlMask, xK_semicolon), quit)]
+                            `M.union` promptKeymap defaultXPConfig
     }
 
 
@@ -309,8 +330,8 @@ myPromptConfig = defaultXPConfig
 -- See the 'XMonad.Hooks.DynamicLog' extension for examples.
 
 myPP = defaultPP
-    { ppCurrent             = xmobarColor base02 blue . wrap " " " "
-    , ppTitle               = xmobarColor blue "" . shorten 40
+    { ppCurrent             = xmobarColor base02 active . wrap " " " "
+    , ppTitle               = xmobarColor active "" . shorten 40
     , ppVisible             = wrap "(" ")"
     , ppUrgent              = xmobarColor base02 yellow . wrap " " " "
     , ppHidden              = id
@@ -328,7 +349,7 @@ myPP = defaultPP
 
 myLogHook = do
     historyHook -- used for history navigation from X.A.GroupNavigation
-    -- fadeInactiveCurrentWSLogHook 0xccccdddd -- 0xbbbbbbbb
+    -- fadeInactiveCurrentWSLogHook 0xeeeeeeee -- 0xbbbbbbbb
     copies <- wsContainingCopies -- from XMonad.Actions.CopyWindow
     let check ws | ws `elem` copies = xmobarColor yellow base02 $ ws
                  | otherwise = ws
@@ -388,15 +409,7 @@ keysWindows conf =
 
     ,("C-m",                addName "Focus on master"               $ windows W.focusMaster)
 --    ,("C-S-m",              addName "Swap with master"              $ windows W.swapMaster)
-
     ]
-
-
---      noEmptyOrSP :: [WorkspaceId] -> X (WindowSpace -> Bool)
---      noEmptyOrSP s = do nsp <- gets (skipTags s . W.hidden . windowset)
---                         return (\w -> isJust (W.stack w) && w `elem` nsp)
-
-
 
 keysWorkspaces conf =
 
@@ -407,15 +420,7 @@ keysWorkspaces conf =
     ] where
         gotoWSPrompt   = workspacePrompt wsPromptConfig $ windows . W.view  -- not W.greedyView
         shiftWSPrompt  = workspacePrompt wsPromptConfig $ windows . W.shift
-        wsPromptConfig = myPromptConfig
-                         {searchPredicate = isPrefixOf . (map toLower)
-                 ,promptKeymap    = M.fromList
-                          [((controlMask, xK_space), quit)
-                          ,((controlMask, xK_semicolon), quit)
-                          ,((mod1Mask .|. controlMask, xK_semicolon), quit)]
-                          `M.union` promptKeymap defaultXPConfig
-                         } 
-
+        wsPromptConfig = myPromptConfig {searchPredicate = isPrefixOf . (map toLower) } 
 
 keysScreens conf =
 
@@ -446,6 +451,7 @@ keysSecondaryApps conf =
     ,("M-f",                addName "Filemanager"                   $ toggleSP "filemanager")
     ,("M-z",                addName "Zim wiki"                      $ toggleSP "wiki")
     ,("M-x",                addName "Audio Mixer"                   $ toggleSP "mixer")
+    ,("M-e",                addName "Audio Equalizer"               $ toggleSP "equalizer")
     ,("M-p",                addName "Process monitor"               $ toggleSP "htop")
     ,("M-c",                addName "Calendar - week"               $ toggleSP "calweek")
     ,("M-S-c",              addName "Calendar - month"              $ toggleSP "calmonth")
@@ -457,7 +463,9 @@ keysRunPromptSubmap conf =
 
     (subtitle "RUN PROMPT":) $ mkNamedKeymap conf $
 
-    [(runPK "C-<Space>",    addName "Run or raise prompt"           $ runOrRaisePrompt myPromptConfig)
+    [(runPK "C-<Space>",    addName "Run or raise prompt"           $ myPrompt)
+    ,(runPK "C-<Backspace>", addName "Kill Prompt"                  $ killAllPrompt)
+    ,(runPK "C-<F7>",       addName "Display prompt"               $ displayPrompt)
     ,(runPK "M-;",          addName "New terminal 1"                $ spawn myTerminal)
     ,(runPK "M-C-;",        addName "New terminal 2"                $ spawn myTerminal)
     ,(runPK "M-S-;",        addName "New terminal 3"                $ spawn myTerminal)
@@ -465,6 +473,8 @@ keysRunPromptSubmap conf =
     ,(runPK "M-S-<Return>", addName "New term 2"                    $ spawn myTerminal)
     ,(runPK "M-\\",         addName "New broswer 2"                 $ spawn myBrowser)
     ] where
+        oldPrompt = runOrRaisePrompt myPromptConfig
+        myPrompt = shellPrompt myPromptConfig {autoComplete = Nothing}
         runPK k = "C-<Space> " ++ k -- main prompt key trigger combination
 
 keysLayouts conf =
@@ -473,12 +483,10 @@ keysLayouts conf =
     [("C-'",                addName "Next layout"                   $ nextLayout)
     ,("C-S-'",              addName "Sink & refresh layout"         $ sinkAll >> refresh)
     ,("C-M-'",              addName "Sing & hard reset layout"      $ sinkReset)
-    ,("C-M-1",              addName "Layout: 1 window, tabs"        $ goLayout "Tabs")
-    ,("C-M-2",              addName "Layout: 2 up combo 1/2"        $ goLayout "Read/Write")
-    ,("C-M-S-2",            addName "Layout: 2 up combo 1/2"        $ goLayout "Read/Write Tile")
-    ,("C-M-3",              addName "Layout: 2 up combo 1/3"        $ goLayout "Read/Note")
-    ,("C-M-S-3",            addName "Layout: 2 up combo 1/3"        $ goLayout "Read/Note Tile")
-    ,("C-M-4",              addName "Layout: 4 up grid"             $ goLayout "Grid")
+    ,("C-M-1",              addName "Layout: 1 window, tabs"        $ goLayout "Tabs Drag")
+    ,("C-M-2",              addName "Layout: Read Write"            $ goLayout "Read Write")
+    ,("C-M-3",              addName "Layout: Read Note"             $ goLayout "Read Note")
+    ,("C-M-4",              addName "Layout: maximum"               $ goLayout "Maximum")
     ,("C-M-f",              addName "Full Screen"                   $ fullScreen)
     ] where
         showStruts = sendMessage $ SetStruts [minBound .. maxBound] []
@@ -558,6 +566,38 @@ myMouseBindings (XConfig {XMonad.modMask = modm}) = M.fromList $
     ]
 
 -------------------------------------------------------------------- }}}
+-- PROMPTS --------------------------------------------------------- {{{
+
+-- some simpler prompts defined above in key bindings
+
+killAllPrompt = inputPromptWithCompl myPromptConfig 
+                "kill process" runningProcessesCompl ?+ killAllProc
+killAllProc procName = spawn ("killall " ++ procName)
+runningProcessesCompl str = runningProcesses >>= 
+    (\procs -> return $ filter (\proc -> str `isPrefixOf` proc) procs)
+runningProcesses = getDirectoryContents "/proc" >>= 
+    (\dir -> return $ map (\pid -> "/proc/" ++ pid ++ "/comm") $ 
+    filter (\dir -> all isDigit dir) $ dir) >>= 
+    (\filenames -> sequence $ 
+    map (\filename -> openFile filename ReadMode >>= 
+    hGetContents) filenames) >>= 
+    (\procs -> return $ sort $ nub $ 
+    map (\proc -> init proc) procs)
+
+displayPrompt = inputPromptWithCompl promptConfig "Display Mode"
+    (mkComplFunFromList compList) ?+ \d -> spawn $ "displays " ++ d
+        where
+            promptConfig = myPromptConfig
+                { autoComplete = Nothing
+                , showCompletionOnTab = True
+                }
+            compList =
+                ["internal","external","span","mirror"
+                ,"span internal","mirror internal"]
+
+
+
+-------------------------------------------------------------------- }}}
 -- APPS & SCRATCHPADS ---------------------------------------------- {{{
 
 -- TERMINAL -----------------------
@@ -602,76 +642,31 @@ toggleSP sp = namedScratchpadAction myScratchpads sp
 
 spTerminal :: String -> String -> String -> String
 spTerminal f a c    = myTerminal
-                    ++ " -fn " ++ show f ++ " -fb " ++ show f
-                    ++ " -fi " ++ show f ++ " -fbi " ++ show f
-                    ++ " +sb " ++ " -b 15 " ++ a ++ " -e " ++ c
-
+                        ++ " -fn " ++ show f ++ " -fb " ++ show f
+                        ++ " -fi " ++ show f ++ " -fbi " ++ show f
+                        ++ " +sb " ++ " -b 15 " ++ a ++ " -e " ++ c
 myScratchpads =
-    [ NS "htop"
-      (spTerminal myFont "" "htop")
-      (title =? "htop") centWin
-
-    , NS "wifi"
-      (spTerminal myFont "-name wifi" "wifi")
-      (resource =? "wifi") centSquare
-
-    , NS "filemanager"
-      "spacefm"
-      (className =? "Spacefm") nonFloating
-
-    , NS "wiki"
-      "zim"
-      (className =? "Zim") nonFloating
-
-    , NS "spotify"
-      "spotify"
-      (className =? "Spotify") centWinVBig
-
-    , NS "notepad"
-      (spTerminal myFont "-name notepad" "vim")
-      (resource =? "notepad") centSquare
-
-    , NS "mixer"
-      "pavucontrol"
-      (className =? "Pavucontrol") centWinBig
-      -- (spTerminal myFontBig "" "alsamixer")
-      -- (title =? "alsamixer") centWinBig
-
-    , NS "calweek"
-      (spTerminal myFont
-      ("-name calweek -cr " ++ show base03) "gcal view week")
-      (resource =? "calweek") centWinThin
-
-    , NS "calmonth"
-      (spTerminal myFontSmall
-      ("-name calmonth -cr " ++ show base03) "gcal view month")
-      (resource =? "calmonth") centWinVBig
-
+    [ NS "htop"         (spTerminal myFont "" "htop") (title =? "htop") centWin
+    , NS "wifi"         (spTerminal myFont "-name wifi" "wifi") (resource =? "wifi") centSquare
+    , NS "filemanager"  "spacefm" (className =? "Spacefm") nonFloating
+    , NS "wiki"         "zim" (className =? "Zim") nonFloating
+    , NS "spotify"      "spotify" (className =? "Spotify") centWinVBig
+    , NS "notepad"      (spTerminal myFont "-name notepad" "vim") (resource =? "notepad") centSquare
+    , NS "mixer" "      pavucontrol" (className =? "Pavucontrol") centWinBig
+    , NS "equalizer"    "pulseaudio-equalizer-gtk" (className =? "Pulseaudio-equalizer.py") centWinBig
+    , NS "calweek"      (spTerminal myFont ("-name calweek -cr " ++ show base03) "gcal view week")
+                        (resource =? "calweek") centWinThin
+    , NS "calmonth"     (spTerminal myFontSmall ("-name calmonth -cr " ++ show base03) "gcal view month")
+                        (resource =? "calmonth") centWinVBig
     ] where
-
-
         -- order of ratios: left-margin top-margin width height
-
-        centWin     = (customFloating 
-                      $ W.RationalRect (1/6) (1/6) (2/3) (2/3))
-
-        centWinBig  = (customFloating 
-                      $ W.RationalRect (1/8) (1/8) (3/4) (3/4))
-
-        centWinVBig = (customFloating 
-                      $ W.RationalRect (1/40) (1/20) (19/20) (9/10))
-
-        centWinMax  = (customFloating 
-                      $ W.RationalRect (0/1) (0/1) (1/1) (1/1))
-
-        centWinThin = (customFloating 
-                      $ W.RationalRect (1/30) (1/4) (28/30) (1/2))
-
-        centSquare  = (customFloating 
-                      $ W.RationalRect (1/3) (1/4) (1/3) (1/2))
-
-        lowerThird  = (customFloating 
-                      $ W.RationalRect (0) (2/3) (1) (1/3))
+        centWin     = (customFloating $ W.RationalRect (1/6) (1/6) (2/3) (2/3))
+        centWinBig  = (customFloating $ W.RationalRect (1/8) (1/8) (3/4) (3/4))
+        centWinVBig = (customFloating $ W.RationalRect (1/40) (1/20) (19/20) (9/10))
+        centWinMax  = (customFloating $ W.RationalRect (0/1) (0/1) (1/1) (1/1))
+        centWinThin = (customFloating $ W.RationalRect (1/30) (1/4) (28/30) (1/2))
+        centSquare  = (customFloating $ W.RationalRect (1/3) (1/4) (1/3) (1/2))
+        lowerThird  = (customFloating $ W.RationalRect (0) (2/3) (1) (1/3))
 
 -------------------------------------------------------------------- }}}
 -- INITIALIZATION -------------------------------------------------- {{{
@@ -730,13 +725,14 @@ killSystemTray = unspawn "trayer"
 
 initCompositor :: X ()
 initCompositor = spawn
-    $  " pgrep compton || compton -f -D 6 -m 0.95" -- add for shadows: "-cCG"
+    $  " pgrep compton || compton -f -D 6 -m 0.95 -cCGz" -- add for shadows: "-cCG"
     ++ " --vsync drm"
     ++ " --unredir-if-possible"
     ++ " --detect-transient"
     ++ " --detect-client-leader"
-    ++ " --use-ewmh-active-win"
     ++ " --paint-on-overlay"
+    -- ++ " --blur-background-fixed"
+    -- ++ " --use-ewmh-active-win"
     -- or: "xcompmgr -f -D 6" "cairo-compmgr"
 
 killCompositor :: X ()
@@ -804,101 +800,65 @@ myEventHook = fullscreenEventHook <+> docksEventHook
 -- which denotes layout choice.
 
 -- myLayout = (fullscreenFloat . fullscreenFull) $ avoidStruts $ noBorders
-    -- $ onWorkspace "com" mailCall
-    -- $ onWorkspace "sys" (rwtabtab ||| tabs)
-    -- $ tabs ||| magic ||| rwtabtab ||| rwtabtab3 ||| rwtabtile ||| rwtabtile3 ||| maximum
-    -- $ avoidStruts $ noBorders
 
--- myLayout = modWorkspaces ["com","sys"] avoidStruts
---          $ onWorkspaces ["com"] mailCall
---          $ onWorkspaces ["sys"] rwtabtab
---          $ avoidStruts (tabs ||| rwtabtab ||| rwtabtab3 ||| tileTall ||| maximum)
-
--- an alternative to "onWorkspaces" (from X.L.PerWorkspace)
--- would be to use the per workspace action module to assign
--- a "cycle layouts" set on a per workspace basis.
--- however this would not solve the initial state problem.
-
-myLayout = avoidStruts
-     $ onWorkspaces ["com"] (mailCall)
-	 $ onWorkspaces ["sys","pro"] (readWrite ||| tabsD)
-     $ tabsD ||| tileTall ||| tileWide ||| readWrite ||| maximum
+myLayout = avoidStruts -- $ smartBorders
+--   $ onWorkspaces ["com"] (mailCall ||| tileTallD ||| maximum)
+--   $ onWorkspaces ["sys","pro"] (readWrite ||| tabsD ||| maximum)
+--   $ tabsD ||| tileTall ||| tileWide ||| readWrite ||| maximum ||| tabs
+     $ onWorkspaces ["com"] (mailCall ||| tileTall ||| maximum)
+     $ onWorkspaces ["sys","pro"] (readSquare ||| tabs ||| maximum)
+     $ tabs ||| readSquare ||| tileTall ||| tileWide ||| maximum
     where
+
+--      -- noBorders if border width > 0
+--      tileTallD   = renamed [Replace "Tiled Tall"] $ (addBarsD $ Tall nmaster delta halves)
+--      tileWideD   = renamed [Replace "Tiled Wide"] $ (addBarsD $ Mirror $ Tall nmaster delta halves)
+
+        -- smartBorders if border width > 0
         tileTall    = renamed [Replace "Tiled Tall"] $ (Tall nmaster delta halves)
         tileWide    = renamed [Replace "Tiled Wide"] $ (Mirror $ Tall nmaster delta halves)
-        readWrite   = renamed [Replace "Read Write"] $ 
-                      combineTwoP (TwoPane 0.03 0.5) tabsD tabsD
-                      (ClassName browserClass `Or` ClassName "PDFViewer")
-        -- tabs        = renamed [Replace "Tabs"]       $ addTabs $ Simplest
-        -- addTabs l   = spacing 1 $ tabBar shrinkText tabTheme Top 
-        --               $ resizeVertical (fi $ decoHeight tabTheme) $ l
+
+--      readWrite   = renamed [Replace "Read Write"] $ 
+--                    combineTwoP (TwoPane 0.03 0.5) tabs tabs 
+--                    (ClassName browserClass `Or` ClassName "PDFViewer")
+
+--      readNote    = renamed [Replace "Read Note"] $ 
+--                    combineTwoP (TwoPane (3/100) (2/3)) tabs tabs 
+--                    (ClassName browserClass `Or` ClassName "PDFViewer")
+
+        readSquare  = renamed [Replace "Read Square"] $ reflectHoriz $ 
+                      combineTwoP Square tabs tabs 
+                      (Not $ ClassName browserClass)
+                      -- (ClassName browserClass `Or` ClassName "PDFViewer")
+
+--      readWriteD  = renamed [Replace "Read Write Drag"] $ 
+--                    combineTwoP (TwoPane 0.03 0.5) tabsD tabsD
+--                    (ClassName browserClass `Or` ClassName "PDFViewer")
+
+        tabs        = renamed [Replace "Tabs"]       $ addTabs $ Simplest
+        addTabs l   = spacing 1 $ tabBar shrinkText tabTheme Top 
+                      $ resizeVertical (fi $ decoHeight tabTheme) $ l
                       -- w/normal X.L.TabBarDecoration
-        tabsD       = renamed [Replace "TabsD"]      $ addTabsD $ Simplest
-        addTabsD l  = spacing 1 $ tabbedWindowSwitcherDecorationWithImageButtons 
-                      shrinkText myTabbedThemeWithImageButtons (draggingVisualizer $ l)
+
+--      tabsD       = renamed [Replace "Tabs Drag"]      $ addTabsD $ Simplest
+--      addTabsD l  = spacing 1 $ tabbedWindowSwitcherDecorationWithImageButtons 
+--                    shrinkText myTabbedThemeWithImageButtons (draggingVisualizer $ l)
+
+--      addBarsD l  = spacing 1 $ windowSwitcherDecorationWithImageButtons 
+--                    shrinkText myTiledThemeWithImageButtons 
+--                    (draggingVisualizer $ l)
+
         maximum     = renamed [Replace "Maximum"]    $ Full
-        mailCall    = renamed [Replace "Mail Call"]  $ drawer `onLeft` tabsD
+--      mailCall    = renamed [Replace "Mail Call"]  $ drawer `onLeft` tabsD
+        mailCall    = renamed [Replace "Mail Call"]  $ drawer `onLeft` tabs
         drawer      = simpleDrawer 0.0 0.3 (ClassName "Zim")
+
         nmaster     = 1      -- default num of windows in master pane
         halves      = 1/2    -- proportion of screen for master pane
         thirds      = 1/3    -- proportion of screen for master pane
         delta       = 3/100  -- increment % of scrn when resizing panes
 
--- myLayout = avoidStruts (tabs ||| rwtabtab ||| rwtabtab3 ||| tileTall ||| maximum)
---     where
---         tileTall    = renamed [Replace "Tiled Tall"] $ (Mirror $ Tall nmaster delta halves)
---         tileWide    = renamed [Replace "Tiles Wide"] $ Tall nmaster delta halves
---         dragThirds  = renamed [Replace "Tiles 1/3"]  $ dragBars $ Tall nmaster delta thirds
---         dragHalves  = renamed [Replace "Tiles 1/2"]  $ dragBars $ Tall nmaster delta halves
---         dragTall    = renamed [Replace "Tiles 1/2"]  $ dragBars $ Mirror $ Tall nmaster delta halves
---         tabs        = renamed [Replace "Tabs"]       $ dragTabs $ Simplest
---         magic       = renamed [Replace "Magic"]      $ magicFocus (OneBig (3/4) (3/4))
---         maximum     = renamed [Replace "Maximum"]    $ Full
---         mailCall    = renamed [Replace "Mail Call"]  $ drawer `onLeft` tabs
---         drawer      = simpleDrawer 0.0 0.3 (ClassName "Zim")
--- 
---         -- predicate boolean checks
---         -- readingPC   = (ClassName browserClass `Or` ClassName "PDFViewer")
--- 
---         rwtabtab    = renamed [Replace "Read/Write"]
---                       $ drawer `onLeft` (combineTwoP (TwoPane 0.03 0.5) tabs tabs
---                       (ClassName browserClass `Or` ClassName "PDFViewer"))
---                     -- TODO: add other common source/reference items here, such as man pages, etc.
--- 
---         rwtabtab3   = renamed [Replace "Read/Note"] $ combineTwoP (TwoPane 0.03 0.66) tabs tabs
---                     (ClassName browserClass `Or` ClassName "PDFViewer")
--- 
--- --      rwtabtile   = renamed [Replace "Read/Write Tile"] $ combineTwoP (TwoPane 0.03 0.5) tabs tileTall
--- --                  (ClassName browserClass `Or` ClassName "PDFViewer")
--- 
--- --      rwtabtile3  = renamed [Replace "Read/Note Tile"] $ combineTwoP (TwoPane 0.03 0.66) tabs tileTall
--- --                  (ClassName browserClass `Or` ClassName "PDFViewer")
--- 
--- --      rwtabtileD  = renamed [Replace "Read/Write Tile Drag"] $ combineTwoP (TwoPane 0.03 0.5) tabs dragTall
--- --                  (ClassName browserClass `Or` ClassName "PDFViewer")
--- 
--- --      rwtabtile3D = renamed [Replace "Read/Note Tile Drag"] $ combineTwoP (TwoPane 0.03 0.66) tabs dragTall
--- --                  (ClassName browserClass `Or` ClassName "PDFViewer")
--- 
---         -- addTabs uses the official X.L.TabBarDecoration
---         addTabs  l  = tabBar shrinkText tabTheme Top $ resizeVertical (fi $ decoHeight tabTheme) $ l
--- 
---         -- dragTabs uses custom X.L.TabbedWindowSwitcherDecoration
---         dragTabs l  = spacing 1 $ tabbedWindowSwitcherDecorationWithImageButtons 
---                       shrinkText myTabbedThemeWithImageButtons 
---                       (draggingVisualizer $ l)
--- 
---         -- dragBars uses either official X.L.WindowSwitcherDecoration
---         -- or (this case) custom X.L.TabbedWindowSwitcherDecoration
---         dragBars l  = spacing 1 $ windowSwitcherDecorationWithImageButtons 
---                       shrinkText myTiledThemeWithImageButtons 
---                       (draggingVisualizer $ l)
--- 
---         nmaster     = 1      -- default num of windows in master pane
---         halves      = 1/2    -- proportion of screen for master pane
---         thirds      = 1/3    -- proportion of screen for master pane
---         delta       = 3/100  -- increment % of scrn when resizing panes
--- 
+
 -------------------------------------------------------------------- }}}
 -- WORKSPACES ------------------------------------------------------ {{{
 
@@ -1005,6 +965,7 @@ myManageHook = composeAll
     , className =? "Gimp"           --> doFloat
     , resource  =? "desktop_window" --> doIgnore
     , resource  =? "kdesktop"       --> doIgnore ]
+    <+> insertPosition Below Newer
     <+> manageDocks
     <+> namedScratchpadManageHook myScratchpads
 
