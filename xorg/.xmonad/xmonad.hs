@@ -57,8 +57,7 @@ import           XMonad.Util.NamedScratchpad                    -- summon/dismis
 import           XMonad.Util.SpawnOnce                          -- startup, etc.
 import           XMonad.Util.WorkspaceCompare                   -- see workspace keybinding cycling below
 
-import           XMonad.Layout.Square                           -- used for combo layouts
-import           XMonad.Layout.Reflect                          -- used for combo layouts
+import           XMonad.Hooks.CurrentWorkspaceOnTop             -- ensure win dragged between screens staus on top
 
 -- TODO: research what i'm losing by not using ewmh
 -- import        XMonad.Hooks.EwmhDesktops                      -- standard window manager hints support
@@ -121,7 +120,8 @@ green   = "#719e07"
 
 -- 'active' value changes the entire highlight "theme"
 -- including xmobar, window/tab drag bars, prompts, etc.
-active  = blue
+-- active  = blue
+active  = green
 
 -- Whether focus follows the mouse pointer.
 myFocusFollowsMouse :: Bool
@@ -350,6 +350,7 @@ myPP = defaultPP
 myLogHook = do
     historyHook -- used for history navigation from X.A.GroupNavigation
     -- fadeInactiveCurrentWSLogHook 0xeeeeeeee -- 0xbbbbbbbb
+    currentWorkspaceOnTop
     copies <- wsContainingCopies -- from XMonad.Actions.CopyWindow
     let check ws | ws `elem` copies = xmobarColor yellow base02 $ ws
                  | otherwise = ws
@@ -377,8 +378,8 @@ keysXmonad conf =
 
     (subtitle "KILL & RESTART":) $ mkNamedKeymap conf $
 
-    [("C-<Backspace>",      addName "Kill current window"           $ kill1)    -- from X.A.CopyWindow
-    ,("C-S-<Backspace>",    addName "Kill all windows on workspace" $ killAll)  -- from X.A.WithAll
+    [("C-<Backspace>",      addName "Kill current window"           $ kill1)
+    ,("C-S-<Backspace>",    addName "Kill all windows on workspace" $ killAll)
     ,("C-M-<Backspace>",    addName "Restart XMonad"                $ restartXmonad)
     ,("C-M-S-<Backspace>",  addName "Quit XMonad"                   $ quitXmonad)
     ]
@@ -390,11 +391,11 @@ keysWindows conf =
     [("C-j",                addName "GO next window"                $ windows W.focusDown)
     ,("C-k",                addName "GO previous window"            $ windows W.focusUp)
     ,("C-h",                addName "GO other side of combo"        $ windowGo L True)
-    ,("C-l",                addName "GO last active window"         $ nextMatch History (return True))
+    ,("C-l",                addName "GO last active window"         $ nextNonEmptyWS)
 
     ,("C-S-j",              addName "MOVE next window"              $ windows W.swapDown)
     ,("C-S-k",              addName "MOVE previous window"          $ windows W.swapUp)
-    ,("C-S-h",              addName "MOVE other side of combo"      $ sendMessage $ SwapWindow) -- fr. X.L.ComboP
+    ,("C-S-h",              addName "MOVE other side of combo"      $ sendMessage $ SwapWindow)
     ,("C-S-l",              addName "MOVE last active window"       $ nextNonEmptyWS)
 
     ,("C-<Left>",           addName "Go left"                       $ windowGo L True)
@@ -418,7 +419,7 @@ keysWorkspaces conf =
     [("C-;",                addName "Go to workspace prompt"        $ gotoWSPrompt)
     ,("C-M-;",              addName "Send to workspace prompt"      $ shiftWSPrompt)
     ] where
-        gotoWSPrompt   = workspacePrompt wsPromptConfig $ windows . W.view  -- not W.greedyView
+        gotoWSPrompt   = workspacePrompt wsPromptConfig $ windows . W.view -- n.b. not W.greedyView
         shiftWSPrompt  = workspacePrompt wsPromptConfig $ windows . W.shift
         wsPromptConfig = myPromptConfig {searchPredicate = isPrefixOf . (map toLower) } 
 
@@ -457,6 +458,7 @@ keysSecondaryApps conf =
     ,("M-S-c",              addName "Calendar - month"              $ toggleSP "calmonth")
     ,("M-v",                addName "Virtual Box Manager"           $ spawn    "VirtualBox")
     ,("M-w",                addName "Wifi connection menu"          $ toggleSP "wifi")
+    ,("M-k",                addName "Kazam screen recorder"         $ spawn "kazam")
     ]
 
 keysRunPromptSubmap conf =
@@ -483,7 +485,7 @@ keysLayouts conf =
     [("C-'",                addName "Next layout"                   $ nextLayout)
     ,("C-S-'",              addName "Sink & refresh layout"         $ sinkAll >> refresh)
     ,("C-M-'",              addName "Sing & hard reset layout"      $ sinkReset)
-    ,("C-M-1",              addName "Layout: 1 window, tabs"        $ goLayout "Tabs Drag")
+    ,("C-M-1",              addName "Layout: 1 window, tabs"        $ goLayout "TabsD")
     ,("C-M-2",              addName "Layout: Read Write"            $ goLayout "Read Write")
     ,("C-M-3",              addName "Layout: Read Note"             $ goLayout "Read Note")
     ,("C-M-4",              addName "Layout: maximum"               $ goLayout "Maximum")
@@ -517,10 +519,10 @@ keysSystem conf =
 keysSystemCodes :: XConfig Layout -> [((KeyMask, KeySym), NamedAction)]
 keysSystemCodes conf =
 
-    [((0, btnBatt),                     addName "Toggle min/max power modes"    $ spawn "power toggle")
-    ,((0 .|. shiftMask, btnBatt),       addName "Toggle miv/mov power modes"    $ spawn "power toggle pinned")
-    , separator
-    , ((0 .|. controlMask, btnBatt),    addName "Auto power mode"               $ spawn "auto power mode")]
+    [((0, btnBatt), addName "Toggle min/max power modes" $ spawn "power toggle")
+    -- Pinned power modes suspend all screen saver and screen power saving for presentation/video
+    ,((0 .|. shiftMask, btnBatt), addName "Pinned power modes" $ spawn "power toggle pinned")
+    ,((0 .|. controlMask, btnBatt), addName "Auto power mode" $ spawn "auto power mode")]
     where
         btnBatt      = 0x1008ff93
         btnSuspend   = 0x1008ffa7
@@ -651,12 +653,15 @@ myScratchpads =
     , NS "filemanager"  "spacefm" (className =? "Spacefm") nonFloating
     , NS "wiki"         "zim" (className =? "Zim") nonFloating
     , NS "spotify"      "spotify" (className =? "Spotify") centWinVBig
-    , NS "notepad"      (spTerminal myFont "-name notepad" "vim") (resource =? "notepad") centSquare
+    , NS "notepad"      (spTerminal myFont "-name notepad" "vim")
+                        (resource =? "notepad") centSquare
     , NS "mixer" "      pavucontrol" (className =? "Pavucontrol") centWinBig
-    , NS "equalizer"    "pulseaudio-equalizer-gtk" (className =? "Pulseaudio-equalizer.py") centWinBig
+    , NS "equalizer"    "pulseaudio-equalizer-gtk"
+                        (className =? "Pulseaudio-equalizer.py") centWin
     , NS "calweek"      (spTerminal myFont ("-name calweek -cr " ++ show base03) "gcal view week")
                         (resource =? "calweek") centWinThin
-    , NS "calmonth"     (spTerminal myFontSmall ("-name calmonth -cr " ++ show base03) "gcal view month")
+    , NS "calmonth"     (spTerminal myFontSmall
+                        ("-name calmonth -cr " ++ show base03) "gcal view month")
                         (resource =? "calmonth") centWinVBig
     ] where
         -- order of ratios: left-margin top-margin width height
@@ -702,8 +707,33 @@ restartXmonad = do
 unspawn :: String -> X ()
 unspawn p = spawn $ "for pid in $(pgrep " ++ p ++ "); do kill -9 $pid; done" 
 
+initStalonetray :: X ()
+initStalonetray = spawn
+    $  " pgrep stalonetray || stalonetray"
+    ++ " --dockapp-mode none"
+    ++ " --background '#073642'"
+    ++ " --icon-size 18"
+    ++ " --slot-size 20"
+    -- ++ " --sticky"
+    ++ " --window-strut auto"
+    ++ " --window-type dock"
+    ++ " --geometry 6x1-1+0"
+    ++ " --max-geometry 6x1"
+    ++ " --icon-gravity W" -- NE"
+    ++ " --grow-gravity W"
+    ++ " --kludges fix_window_pos,force_icons_size" -- ,use_icon_hints"
+    ++ " --window-layer bottom"
+
+killStaloneTray :: X ()
+killStaloneTray = unspawn "stalonetray"
+
 initSystemTray :: X ()
-initSystemTray = spawn
+initSystemTray = spawn "systray"
+killSystemTray :: X ()
+killSystemTray = return ()
+
+initTrayer :: X ()
+initTrayer = spawn
     $  " pgrep trayer || trayer"
     ++ " --edge top"
     ++ " --align right"
@@ -720,8 +750,8 @@ initSystemTray = spawn
     ++ " --heighttype pixel"
     ++ " --height 20"
 
-killSystemTray :: X ()
-killSystemTray = unspawn "trayer"
+killTrayer :: X ()
+killTrayer = unspawn "trayer"
 
 initCompositor :: X ()
 initCompositor = spawn
@@ -788,7 +818,7 @@ warn s = spawn $ "warn "++ s
 
 myEventHook = fullscreenEventHook <+> docksEventHook
 
--------------------------------------------------------------------- }}}
+-------------------------------------------------------------------- }}}  
 -- LAYOUTS --------------------------------------------------------- {{{
 
 -- You can specify and transform your layouts by modifying these values.
@@ -802,56 +832,59 @@ myEventHook = fullscreenEventHook <+> docksEventHook
 -- myLayout = (fullscreenFloat . fullscreenFull) $ avoidStruts $ noBorders
 
 myLayout = avoidStruts -- $ smartBorders
---   $ onWorkspaces ["com"] (mailCall ||| tileTallD ||| maximum)
---   $ onWorkspaces ["sys","pro"] (readWrite ||| tabsD ||| maximum)
---   $ tabsD ||| tileTall ||| tileWide ||| readWrite ||| maximum ||| tabs
      $ onWorkspaces ["com"] (mailCall ||| tileTall ||| maximum)
-     $ onWorkspaces ["sys","pro"] (readSquare ||| tabs ||| maximum)
-     $ tabs ||| readSquare ||| tileTall ||| tileWide ||| maximum
+     $ onWorkspaces ["sys","pro"] (readWrite ||| tabsD ||| maximum)
+     $ (tabsD ||| readWrite ||| tileTall ||| tileWide ||| maximum)
+     -- $ onWorkspaces ["sys","pro"] (notes `onRight` (readWrite ||| tabsD ||| maximum))
+     -- $ notes `onRight` (tabsD ||| readWrite ||| tileTall ||| tileWide ||| maximum)
     where
 
 --      -- noBorders if border width > 0
---      tileTallD   = renamed [Replace "Tiled Tall"] $ (addBarsD $ Tall nmaster delta halves)
---      tileWideD   = renamed [Replace "Tiled Wide"] $ (addBarsD $ Mirror $ Tall nmaster delta halves)
+--      tileTallD   = renamed [Replace "Tiled Tall"]
+--                    $ (addBarsD $ Tall nmaster delta halves)
+--      tileWideD   = renamed [Replace "Tiled Wide"]
+--                    $ (addBarsD $ Mirror $ Tall nmaster delta halves)
 
         -- smartBorders if border width > 0
         tileTall    = renamed [Replace "Tiled Tall"] $ (Tall nmaster delta halves)
         tileWide    = renamed [Replace "Tiled Wide"] $ (Mirror $ Tall nmaster delta halves)
 
---      readWrite   = renamed [Replace "Read Write"] $ 
---                    combineTwoP (TwoPane 0.03 0.5) tabs tabs 
+        readWrite   = renamed [Replace "Read Write"] $ 
+                      combineTwoP (TwoPane (3/100) (57/100)) tabs tabs -- 57/100 optimal?
+                      (ClassName browserClass `Or` ClassName "PDFViewer")
+
+        readNote    = renamed [Replace "Read Note"] $ 
+                      stickyNotes `onRight` tabs -- 57/100 optimal?
+
+--      readColumn  = renamed [Replace "Read Column"] $ 
+--                    combineTwoP () tabs tabs 
 --                    (ClassName browserClass `Or` ClassName "PDFViewer")
 
---      readNote    = renamed [Replace "Read Note"] $ 
---                    combineTwoP (TwoPane (3/100) (2/3)) tabs tabs 
---                    (ClassName browserClass `Or` ClassName "PDFViewer")
-
-        readSquare  = renamed [Replace "Read Square"] $ reflectHoriz $ 
-                      combineTwoP Square tabs tabs 
-                      (Not $ ClassName browserClass)
-                      -- (ClassName browserClass `Or` ClassName "PDFViewer")
+--      fixedColumn = renamed [Replace "Fixed 80"] $
+--                    reflectHoriz $ limitWindows 2 $ FixedColumn 1 20 80 10
 
 --      readWriteD  = renamed [Replace "Read Write Drag"] $ 
 --                    combineTwoP (TwoPane 0.03 0.5) tabsD tabsD
 --                    (ClassName browserClass `Or` ClassName "PDFViewer")
 
-        tabs        = renamed [Replace "Tabs"]       $ addTabs $ Simplest
+        tabs        = renamed [Replace "Tabs"] $ addTabs $ Simplest
         addTabs l   = spacing 1 $ tabBar shrinkText tabTheme Top 
                       $ resizeVertical (fi $ decoHeight tabTheme) $ l
                       -- w/normal X.L.TabBarDecoration
 
---      tabsD       = renamed [Replace "Tabs Drag"]      $ addTabsD $ Simplest
---      addTabsD l  = spacing 1 $ tabbedWindowSwitcherDecorationWithImageButtons 
---                    shrinkText myTabbedThemeWithImageButtons (draggingVisualizer $ l)
+        tabsD       = renamed [Replace "TabsD"] $ addTabsD $ Simplest
+        addTabsD l  = spacing 1 $ tabbedWindowSwitcherDecorationWithImageButtons 
+                      shrinkText myTabbedThemeWithImageButtons (draggingVisualizer $ l)
 
 --      addBarsD l  = spacing 1 $ windowSwitcherDecorationWithImageButtons 
 --                    shrinkText myTiledThemeWithImageButtons 
 --                    (draggingVisualizer $ l)
 
         maximum     = renamed [Replace "Maximum"]    $ Full
---      mailCall    = renamed [Replace "Mail Call"]  $ drawer `onLeft` tabsD
-        mailCall    = renamed [Replace "Mail Call"]  $ drawer `onLeft` tabs
+        mailCall    = renamed [Replace "Mail Call"]  $ drawer `onRight` tabsD
         drawer      = simpleDrawer 0.0 0.3 (ClassName "Zim")
+        notes       = simpleDrawer 0.0 0.3 (ClassName "Zim")
+        stickyNotes = simpleDrawer (1/3) (1/2) (Not $ ClassName browserClass)
 
         nmaster     = 1      -- default num of windows in master pane
         halves      = 1/2    -- proportion of screen for master pane
