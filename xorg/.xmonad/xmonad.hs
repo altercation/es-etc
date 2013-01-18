@@ -24,10 +24,12 @@ import           XMonad.Actions.TopicSpace                      -- workspaces wi
 import           XMonad.Actions.UpdatePointer                   -- cursor management, useful changing screens
 import           XMonad.Actions.WindowGo                        -- raising/going to windows
 import           XMonad.Actions.WithAll                         -- actions on multiple windows (killAll, etc.)
+import           XMonad.Hooks.CurrentWorkspaceOnTop             -- ensure win dragged between screens staus on top
 import           XMonad.Hooks.DynamicLog                        -- support for "untethered" xmobar
 import           XMonad.Hooks.FadeInactive                      -- fade out windows that aren't currently active
 import           XMonad.Hooks.InsertPosition                    -- config where new windows insert
 import           XMonad.Hooks.ManageDocks                       -- avoid statusbar/systray
+import           XMonad.Hooks.ManageHelpers                     -- manage dialogs, etc.
 import           XMonad.Hooks.UrgencyHook                       -- visually alert urgency in status bar
 import           XMonad.Layout.Combo                            -- combine multiple layouts
 import           XMonad.Layout.ComboP                           -- combine layouts with designated master apps
@@ -54,10 +56,9 @@ import           XMonad.Util.EZConfig                           -- clean keybind
 import           XMonad.Util.Image                              -- for window decoration icons
 import           XMonad.Util.NamedActions                       -- self documenting keybindings (CUSTOM)
 import           XMonad.Util.NamedScratchpad                    -- summon/dismiss running app windows
+import           XMonad.Util.Run                                -- used for runInTerm
 import           XMonad.Util.SpawnOnce                          -- startup, etc.
 import           XMonad.Util.WorkspaceCompare                   -- see workspace keybinding cycling below
-
-import           XMonad.Hooks.CurrentWorkspaceOnTop             -- ensure win dragged between screens staus on top
 
 -- TODO: research what i'm losing by not using ewmh
 -- import        XMonad.Hooks.EwmhDesktops                      -- standard window manager hints support
@@ -289,6 +290,7 @@ closeButton' = [[0,0,0,0,0,0,0,0,0,0],
 closeButton :: [[Bool]]
 closeButton = convertToBool closeButton' 
 
+-- alternate color scheme
 myPromptConfig = basePromptConfig
     {font               = myFontBig
     ,bgColor            = active
@@ -318,7 +320,8 @@ basePromptConfig = defaultXPConfig
                             ,((controlMask, xK_l), quit)
                             ,((controlMask, xK_semicolon), quit)
                             ,((controlMask, xK_apostrophe), quit)
-                            ,((mod1Mask .|. controlMask, xK_semicolon), quit)]
+                            ,((mod1Mask .|. controlMask, xK_semicolon), quit)
+                            ,((mod1Mask .|. controlMask, xK_apostrophe), quit)]
                             `M.union` promptKeymap defaultXPConfig
     }
 
@@ -391,7 +394,8 @@ keysWindows conf =
     [("C-j",                addName "GO next window"                $ windows W.focusDown)
     ,("C-k",                addName "GO previous window"            $ windows W.focusUp)
     ,("C-h",                addName "GO other side of combo"        $ windowGo L True)
-    ,("C-l",                addName "GO last active window"         $ nextNonEmptyWS)
+    ,("C-l",                addName "GO to next nonempty workspace" $ nextNonEmptyWS)
+    ,("C-p",                addName "GO previously active window"   $ nextMatch History (return True))
 
     ,("C-S-j",              addName "MOVE next window"              $ windows W.swapDown)
     ,("C-S-k",              addName "MOVE previous window"          $ windows W.swapUp)
@@ -441,6 +445,7 @@ keysMainApps conf =
     (subtitle "MAIN APPS":) $ mkNamedKeymap conf $
 
     [("C-<Return>",         addName "New terminal"                  $ spawn myTerminal)
+    ,("C-M-<Return>",       addName "New terminal"                  $ currentTopicAction myTopicConfig)
     ,("C-\\",               addName "New broswer"                   $ spawn myBrowser)
     ]
 
@@ -467,7 +472,7 @@ keysRunPromptSubmap conf =
 
     [(runPK "C-<Space>",    addName "Run or raise prompt"           $ myPrompt)
     ,(runPK "C-<Backspace>", addName "Kill Prompt"                  $ killAllPrompt)
-    ,(runPK "C-<F7>",       addName "Display prompt"               $ displayPrompt)
+    ,(runPK "C-<F7>",       addName "Display prompt"                $ displayPrompt)
     ,(runPK "M-;",          addName "New terminal 1"                $ spawn myTerminal)
     ,(runPK "M-C-;",        addName "New terminal 2"                $ spawn myTerminal)
     ,(runPK "M-S-;",        addName "New terminal 3"                $ spawn myTerminal)
@@ -485,9 +490,9 @@ keysLayouts conf =
     [("C-'",                addName "Next layout"                   $ nextLayout)
     ,("C-S-'",              addName "Sink & refresh layout"         $ sinkAll >> refresh)
     ,("C-M-'",              addName "Sing & hard reset layout"      $ sinkReset)
-    ,("C-M-1",              addName "Layout: 1 window, tabs"        $ goLayout "TabsD")
-    ,("C-M-2",              addName "Layout: Read Write"            $ goLayout "Read Write")
-    ,("C-M-3",              addName "Layout: Read Note"             $ goLayout "Read Note")
+    ,("C-M-1",              addName "Layout: 1 window, tabs"        $ goLayout "Magic Tabs")
+    ,("C-M-2",              addName "Layout: Half & Half"           $ goLayout "Half & Half")
+    ,("C-M-3",              addName "Layout: Read Write"            $ goLayout "Read Write")
     ,("C-M-4",              addName "Layout: maximum"               $ goLayout "Maximum")
     ,("C-M-f",              addName "Full Screen"                   $ fullScreen)
     ] where
@@ -673,6 +678,17 @@ myScratchpads =
         centSquare  = (customFloating $ W.RationalRect (1/3) (1/4) (1/3) (1/2))
         lowerThird  = (customFloating $ W.RationalRect (0) (2/3) (1) (1/3))
 
+-- TOPIC ACTIONS ------------------
+
+comTA = do
+        restartIMAP -- TODO: handle this better, in systemd directly or on wakeup?
+        initMailLog
+        initMail
+        where
+            restartIMAP = spawn "restart-offlineimap"
+            initMail    = raiseMaybe (runInTerm "-title mail" "mutt") (title =? "mail")
+            initMailLog = raiseMaybe (runInTerm "-title maillog" "tail -F ~/.offlineimaplog") (title =? "maillog")
+
 -------------------------------------------------------------------- }}}
 -- INITIALIZATION -------------------------------------------------- {{{
 
@@ -687,6 +703,7 @@ myStartupHook = do
     initAudioTray
     initNotifier
     initTerminal
+    initMiscApps
     spawn "bloop up"
 
 quitXmonad = do
@@ -730,7 +747,7 @@ killStaloneTray = unspawn "stalonetray"
 initSystemTray :: X ()
 initSystemTray = spawn "systray"
 killSystemTray :: X ()
-killSystemTray = return ()
+killSystemTray = spawn "systray" -- systray just repositions, so we do this early
 
 initTrayer :: X ()
 initTrayer = spawn
@@ -780,13 +797,21 @@ initStatusBar :: X ()
 initStatusBar = spawn "pgrep xmobar || xmobar ~/etc/xorg/.xmobarrc-minimal"
 
 killStatusBar :: X ()
-killStatusBar = unspawn "xmobar"
+killStatusBar = return () -- unspawn "xmobar"
 
 initAudioTray :: X ()
 initAudioTray = spawn   "pgrep pasystray || pasystray &"
 
 killAudioTray :: X ()
 killAudioTray = unspawn "pasystray"
+
+runIfNot :: String -> String -> X ()
+runIfNot c e = spawn $ "pgrep " ++ c ++ " || " ++ e
+
+initMiscApps = do
+    runIfNot "zim" "zim --plugin trayicon"
+    runIfNot "dropbox" "dropboxd &"
+    runIfNot "xscreensaver" "/usr/bin/xscreensaver -no-splash -no-capture-stderr &"
 
 initWallpaper :: X ()
 initWallpaper = spawn   "~/bin/live"
@@ -833,10 +858,8 @@ myEventHook = fullscreenEventHook <+> docksEventHook
 
 myLayout = avoidStruts -- $ smartBorders
      $ onWorkspaces ["com"] (mailCall ||| tileTall ||| maximum)
-     $ onWorkspaces ["sys","pro"] (readWrite ||| tabsD ||| maximum)
-     $ (tabsD ||| readWrite ||| tileTall ||| tileWide ||| maximum)
-     -- $ onWorkspaces ["sys","pro"] (notes `onRight` (readWrite ||| tabsD ||| maximum))
-     -- $ notes `onRight` (tabsD ||| readWrite ||| tileTall ||| tileWide ||| maximum)
+     $ onWorkspaces ["sys","pro"] (halfHalf ||| magicTabs ||| maximum ||| halfHalf)
+     $ (magicTabs ||| halfHalf ||| tileTall ||| tileWide ||| maximum ||| halfHalf)
     where
 
 --      -- noBorders if border width > 0
@@ -853,6 +876,10 @@ myLayout = avoidStruts -- $ smartBorders
                       combineTwoP (TwoPane (3/100) (57/100)) tabs tabs -- 57/100 optimal?
                       (ClassName browserClass `Or` ClassName "PDFViewer")
 
+        halfHalf    = renamed [Replace "Half & Half"] $ 
+                      combineTwoP (TwoPane (3/100) (1/2)) tabs tabs -- 57/100 optimal?
+                      (ClassName browserClass `Or` ClassName "PDFViewer")
+
         readNote    = renamed [Replace "Read Note"] $ 
                       stickyNotes `onRight` tabs -- 57/100 optimal?
 
@@ -864,7 +891,7 @@ myLayout = avoidStruts -- $ smartBorders
 --                    reflectHoriz $ limitWindows 2 $ FixedColumn 1 20 80 10
 
 --      readWriteD  = renamed [Replace "Read Write Drag"] $ 
---                    combineTwoP (TwoPane 0.03 0.5) tabsD tabsD
+--                    combineTwoP (TwoPane 0.03 0.5) magicTabs magicTabs
 --                    (ClassName browserClass `Or` ClassName "PDFViewer")
 
         tabs        = renamed [Replace "Tabs"] $ addTabs $ Simplest
@@ -872,7 +899,7 @@ myLayout = avoidStruts -- $ smartBorders
                       $ resizeVertical (fi $ decoHeight tabTheme) $ l
                       -- w/normal X.L.TabBarDecoration
 
-        tabsD       = renamed [Replace "TabsD"] $ addTabsD $ Simplest
+        magicTabs   = renamed [Replace "Magic Tabs"] $ addTabsD $ Simplest
         addTabsD l  = spacing 1 $ tabbedWindowSwitcherDecorationWithImageButtons 
                       shrinkText myTabbedThemeWithImageButtons (draggingVisualizer $ l)
 
@@ -881,7 +908,7 @@ myLayout = avoidStruts -- $ smartBorders
 --                    (draggingVisualizer $ l)
 
         maximum     = renamed [Replace "Maximum"]    $ Full
-        mailCall    = renamed [Replace "Mail Call"]  $ drawer `onRight` tabsD
+        mailCall    = renamed [Replace "Mail Call"]  $ drawer `onRight` magicTabs
         drawer      = simpleDrawer 0.0 0.3 (ClassName "Zim")
         notes       = simpleDrawer 0.0 0.3 (ClassName "Zim")
         stickyNotes = simpleDrawer (1/3) (1/2) (Not $ ClassName browserClass)
@@ -951,7 +978,7 @@ myTopicConfig = defaultTopicConfig
                          spawnShellIn ".xmonad" >>
                          spawnShellIn ".xmonad")
         , ("irc",        spawn "weechat")
-        , ("com",        return ()) -- offlineimap >> showMail) 
+        , ("com",        comTA) -- offlineimap >> showMail) 
         , ("dashboard",  spawnShell)
         , ("twitter",    spawnShell)
         , ("web",        newBrowser)
@@ -994,10 +1021,12 @@ promptedShift = workspacePrompt myPromptConfig $ windows . W.shift
 -- 'className' and 'resource' are used below.
 
 myManageHook = composeAll
-    [ className =? "MPlayer"        --> doFloat
+    [ transience'
+    , className =? "MPlayer"        --> doFloat
     , className =? "Gimp"           --> doFloat
     , resource  =? "desktop_window" --> doIgnore
-    , resource  =? "kdesktop"       --> doIgnore ]
+    , resource  =? "kdesktop"       --> doIgnore
+    , isDialog                      --> doFloat ]
     <+> insertPosition Below Newer
     <+> manageDocks
     <+> namedScratchpadManageHook myScratchpads

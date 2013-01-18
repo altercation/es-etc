@@ -2,6 +2,7 @@ _dotfile_root="$HOME/etc"; _dotfile_trash="$HOME/tmp/_df_trash"; _managed_files=
 _dotfile_list="$(find "$_dotfile_root" -name ".*" ! -name ".git" -print)"
 
 _special_files="
+$_dotfile_root/mail/muttrc_kz .muttrc
 $_dotfile_root/irc/irssi .irssi/config
 $_dotfile_root/xorg/dunstrc .config/dunstrc
 $_dotfile_root/web/googlecl-config .config/googlecl/config

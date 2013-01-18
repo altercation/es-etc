@@ -70,7 +70,6 @@ _touch_id="$(xsetwacom --list devices | grep TOUCH | sed 's/^.*id:\s*\(\w*\)\W.*
 #xbindkeys -f $HOME/.xbindkeysrc -X :0
 
 #compton &
+#/usr/bin/xscreensaver -no-splash -no-capture-stderr &
 /usr/bin/system boot
-/usr/bin/xscreensaver -no-splash -no-capture-stderr &
-dropboxd &
 xmonad
