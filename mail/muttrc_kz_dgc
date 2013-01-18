@@ -202,11 +202,14 @@ set reply_regexp    = "^(([Rr][Ee]?(\[[0-9]+\])?: *)?(\[[^]]+\] *)?)*"
 #set status_chars    = " *RA"
 set attribution     = "On %d, %n wrote:"
 set index_format    = "%3C  %Z  %[!%d %b %R] %?X?▫& ? %?M?%2M&  ? %-20.20F  %s"
-set index_format = `echo "\"%3C  %Z  %<[1y?%<[1w?%<[$(($((10#$(date +%H) + 0)) + 24))h?%<[$((10#$(date +%H) + 0))h?    Today&Yesterday> %[ %H:%M]&   %[%a %d] %[ %H:%M]>&   %[%b %d]       >&   %[%b %d  %Y] > %?X?▫& ? %<M?%3M-&%<X?%3X+&%4c>>    %-25.25F   %s\""`
+set index_format = `echo "\"%g %3C  %Z  %<[1y?%<[1w?%<[$(($((10#$(date +%H) + 0)) + 24))h?%<[$((10#$(date +%H) + 0))h?    Today&Yesterday> %[ %H:%M]&   %[%a %d] %[ %H:%M]>&   %[%b %d]       >&   %[%b %d  %Y] > %?X?▫& ? %<M?%3M-&%<X?%3X+&%4c>>    %-25.25F   %s\""`
 
 # ------------------------------------------------------------------------------
 # kz specific
 # ------------------------------------------------------------------------------
+
+set nm_default_uri="notmuch:///home/es/var/mail/accounts"
+set virtual_spoolfile	= yes
 set sidebar_width   = 35
 set sidebar_visible = yes
 color sidebar_new green default
@@ -215,3 +218,5 @@ bind index <right> sidebar-next
 bind index <space> sidebar-open
 bind index <Esc>S sidebar-toggle
 
+virtual-mailboxes \
+	   "INBOX"                "notmuch://?query=tag:inbox and NOT tag:archive"
