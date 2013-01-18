@@ -78,7 +78,7 @@ set certificate_file  = $MAILDATA/mutt/certificates
 set tmpdir            = $MAILDATA/mutt/temp
 
 #not using cached headers/footers since I'm using offlineimap locally
-#set header_cache     = $MAILDATA/mutt/cache/headers
+set header_cache     = $MAILDATA/mutt/cache/headers
 #set message_cachedir = $MAILDATA/mutt/cache/bodies
 
 # ------------------------------------------------------------------------------
@@ -122,7 +122,6 @@ set query_command  = "goobook query '%s'"
 # ------------------------------------------------------------------------------
 
 set uncollapse_new=yes
-
 folder-hook . 'push <collapse-all>'    # collapse threads on folder entry
 
 # messages marked as deleted will be saved with the maildir trashed flag instead of unlinked
@@ -133,55 +132,56 @@ folder-hook . 'push <collapse-all>'    # collapse threads on folder entry
 # unfortunately this also means deleted mails stick around till a full sync cycle.
 set maildir_trash=yes                       
 
-set mail_check      = 0                     # minimum time between scans
-set pager_index_lines= 10                   # number of index lines to show
-set pager_context   = 5                     # number of context lines to show
+# NB: "set mail_check = 0" results in a massive UI slowdown running my mutt-kz-dgc-git
+## set mail_check      = 0                     # minimum time between scans
+## set pager_index_lines= 10                   # number of index lines to show
+## set pager_context   = 5                     # number of context lines to show
 set sort            = threads               # like gmail
 set sort_alias      = alias                 # sort alias menu by name, not email
 set sort_aux        = reverse-last-date-received    # like gmail
-set timeout         = 1                     # idle time before scanning
+## set timeout         = 1                     # idle time before scanning
 set wait_key        = no                    # suppress "press any key to continue" in, eg, urlview
 unset arrow_cursor                          # show an arrow indicator instead of highlighting whole line
-set auto_tag                                # automatically act on all currently tagged messages
+## set auto_tag                                # automatically act on all currently tagged messages
 set beep_new                                # beep on new
 set beep                                    # beep on errors
-unset confirmappend                         # don't prompt for confirmation of appending to a mailbox
-set delete                                  # delete messages without prompting when closing or syncing a mailbox
-unset delete_untag                          # ???
-unset markers                               # no ugly plus signs
-unset mark_old                              # if set marks new messages "O" old even if not yet read
-set menu_scroll                             # scroll in menus
-unset move                                  # gmail does this; default off, unset just to be safe
-set pager_stop                              # don't go to next message automatically
-set pipe_decode                             # strip headers and eval mimes when piping
-set reverse_alias                           # show names from alias file in index
-set sig_dashes                              # dashes before sig
-set smart_wrap                              # don't split words
-unset sort_re                               # always thread
-set thorough_search                         # strip headers and eval mimes before searching
+## unset confirmappend                         # don't prompt for confirmation of appending to a mailbox
+## set delete                                  # delete messages without prompting when closing or syncing a mailbox
+## unset delete_untag                          # ???
+## unset markers                               # no ugly plus signs
+## unset mark_old                              # if set marks new messages "O" old even if not yet read
+## set menu_scroll                             # scroll in menus
+## unset move                                  # gmail does this; default off, unset just to be safe
+## set pager_stop                              # don't go to next message automatically
+## set pipe_decode                             # strip headers and eval mimes when piping
+## set reverse_alias                           # show names from alias file in index
+## set sig_dashes                              # dashes before sig
+## set smart_wrap                              # don't split words
+## unset sort_re                               # always thread
+## set thorough_search                         # strip headers and eval mimes before searching
 set thread_received                         # sort threads by date received, not sent
-set tilde                                   # show tildes like in vim
+## set tilde                                   # show tildes like in vim
 unset strict_threads                        # don't match just on subject value
-set uncollapse_jump                         # when uncollapsed, jump to next unread in thread
-set quit                                    # immediate quit, no prompt
-
-# ENRICHED MESSAGES
-auto_view text/html                         # view html automatically
-#auto_view application/pdf                  # auto view pdfs
-#auto_view application/msword               # auto view word docs
-alternative_order text/plain text/enriched text/html # but save it for last
-
-# COMPOSING MAIL
-set askcc                                   # always ask for CC:
-set edit_headers                            # show headers when composing
-set fast_reply                              # skip to compose when replying
-#set fcc_attach                             # ???
-set forward_format  = "Fwd: %s"             # subject format when forwarding
-set forward_quote                           # include message in forwards
-set include                                 # include message in replies
-#unset metoo                                # don't reply to me
-#unset reply_self                           # don't reply to me
-set reply_to                                # reply to Reply-to:, not From:
+## set uncollapse_jump                         # when uncollapsed, jump to next unread in thread
+## set quit                                    # immediate quit, no prompt
+## 
+## # ENRICHED MESSAGES
+## auto_view text/html                         # view html automatically
+## #auto_view application/pdf                  # auto view pdfs
+## #auto_view application/msword               # auto view word docs
+## alternative_order text/plain text/enriched text/html # but save it for last
+## 
+## # COMPOSING MAIL
+## set askcc                                   # always ask for CC:
+## set edit_headers                            # show headers when composing
+## set fast_reply                              # skip to compose when replying
+## #set fcc_attach                             # ???
+## set forward_format  = "Fwd: %s"             # subject format when forwarding
+## set forward_quote                           # include message in forwards
+## set include                                 # include message in replies
+## #unset metoo                                # don't reply to me
+## #unset reply_self                           # don't reply to me
+## set reply_to                                # reply to Reply-to:, not From:
 
 # ------------------------------------------------------------------------------
 # lists
@@ -207,11 +207,11 @@ set index_format = `echo "\"%3C  %Z  %<[1y?%<[1w?%<[$(($((10#$(date +%H) + 0)) +
 # ------------------------------------------------------------------------------
 # kz specific
 # ------------------------------------------------------------------------------
-# set sidebar_width   = 35
-# set sidebar_visible = yes
-# color sidebar_new yellow default
-# bind index <left> sidebar-prev
-# bind index <right> sidebar-next
-# bind index <space> sidebar-open
-# bind index <Esc>S sidebar-toggle
+set sidebar_width   = 35
+set sidebar_visible = yes
+color sidebar_new green default
+bind index <left> sidebar-prev
+bind index <right> sidebar-next
+bind index <space> sidebar-open
+bind index <Esc>S sidebar-toggle
 
