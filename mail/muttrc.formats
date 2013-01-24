@@ -1,0 +1,16 @@
+# ------------------------------------------------------------------------------
+# formats and regexps
+# ------------------------------------------------------------------------------
+
+set alias_format    = "%4n %t %-20a %r"
+set date_format     = "%m/%d/%y at %I:%M%P"
+set quote_regexp    = "^( {0,4}[>|:#%]| {0,4}[a-z0-9]+[>|]+)+"
+set reply_regexp    = "^(([Rr][Ee]?(\[[0-9]+\])?: *)?(\[[^]]+\] *)?)*"
+#set status_format   = "%r├───── %f %m%?n? [+%n]?%?d? [-%d]?%?t? [*%t]? ─%?p?─── %p waiting to send ?─%>─ %P ───"
+#set status_chars    = " *RA"
+set attribution     = "On %d, %n wrote:"
+set index_format    = "%3C  %Z  %[!%d %b %R] %?X?▫& ? %?M?%2M&  ? %-20.20F  %s"
+#set index_format = `echo "\"%3C  %Z  %<[1y?%<[1w?%<[$(($((10#$(date +%H) + 0)) + 24))h?%<[$((10#$(date +%H) + 0))h?    Today&Yesterday> %[ %H:%M]&   %[%a %d] %[ %H:%M]>&   %[%b %d]       >&   %[%b %d  %Y] > %?X?▫& ? %<M?%3M-&%<X?%3X+&%4c>>    %-25.25F   %s%*    %?g?(&?%g%?g?)&?\""`
+#set index_format = `echo "\"%3C  %Z  %<[1y?%<[1w?%<[$(($((10#$(date +%H) + 0)) + 24))h?%<[$((10#$(date +%H) + 0))h?    Today&Yesterday> %[ %H:%M]&   %[%a %d] %[ %H:%M]>&   %[%b %d]       >&   %[%b %d  %Y] > %?X?▫& ? %<M?%3M-&%<X?%3X+&%4c>>    %-8.8g    %-25.25F   %s%*\""`
+set index_format = `echo "\"%3C  %Z  %<[1y?%<[1w?%<[$(($((10#$(date +%H) + 0)) + 24))h?%<[$((10#$(date +%H) + 0))h?    Today&Yesterday> %[ %H:%M]&   %[%a %d] %[ %H:%M]>&   %[%b %d]       >&   %[%b %d  %Y] > %?X?▫& ? %?g?+& ?%-8.8g   %-27.27F  %s%*   %<M?%3M-&%<X?%3X+&%4c>>\""`
+
