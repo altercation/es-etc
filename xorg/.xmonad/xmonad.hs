@@ -7,6 +7,7 @@
 
 -- `! sort -k1.18` in vim for a sort of these that ignores "qualified"
 
+import           Control.Monad (liftM2)                         -- for viewShift
 import           Data.Char                                      -- toLower, et al
 import           Data.List                                      -- isInfixOf, et al
 import qualified Data.Map as M                                  -- basics
@@ -59,6 +60,8 @@ import           XMonad.Util.NamedScratchpad                    -- summon/dismis
 import           XMonad.Util.Run                                -- used for runInTerm
 import           XMonad.Util.SpawnOnce                          -- startup, etc.
 import           XMonad.Util.WorkspaceCompare                   -- see workspace keybinding cycling below
+
+import           XMonad.Hooks.XPropManage                       -- managing windows based on xprop
 
 -- TODO: research what i'm losing by not using ewmh
 -- import        XMonad.Hooks.EwmhDesktops                      -- standard window manager hints support
@@ -138,6 +141,7 @@ myBorderWidth = 0
 myNormalBorderColor       = "#000000"
 myFocusedBorderColor      = base03  
 
+--- myFontSize s = "xft:Open Sans-" ++ show s ++ ":regular"
 myFontSize s                = "-*-terminus-medium-r-normal--" 
                               ++ show s ++ "-*-*-*-*-*-*-*"
 myFontExtraBig              = myFontSize 20
@@ -166,7 +170,8 @@ baseTheme = defaultTheme
     , urgentBorderColor     = yellow
     , urgentTextColor       = base02
     , fontName              = myFont
-    , decoHeight            = 22
+    -- , decoHeight            = 22
+    , decoHeight            = 20
     }
 
 tabThemeDim :: Theme
@@ -308,7 +313,8 @@ basePromptConfig = defaultXPConfig
     ,bgHLight           = active
     ,borderColor        = base03
     ,promptBorderWidth  = 1
-    ,height             = 22
+    -- ,height          = 22
+    ,height             = 20
     ,autoComplete       = Just 100
     -- default false? , showCompletionOnTab   = True     
     ,searchPredicate    = isInfixOf . (map toLower)
@@ -384,6 +390,7 @@ keysXmonad conf =
     [("C-<Backspace>",      addName "Kill current window"           $ kill1)
     ,("C-S-<Backspace>",    addName "Kill all windows on workspace" $ killAll)
     ,("C-M-<Backspace>",    addName "Restart XMonad"                $ restartXmonad)
+    -- ,("C-M-<Backspace>",    addName "Restart XMonad"                $ rebuildXmonad)
     ,("C-M-S-<Backspace>",  addName "Quit XMonad"                   $ quitXmonad)
     ]
 
@@ -577,7 +584,7 @@ myMouseBindings (XConfig {XMonad.modMask = modm}) = M.fromList $
 
 -- some simpler prompts defined above in key bindings
 
-killAllPrompt = inputPromptWithCompl myPromptConfig 
+killAllPrompt = inputPromptWithCompl myPromptConfig {autoComplete = Nothing}
                 "kill process" runningProcessesCompl ?+ killAllProc
 killAllProc procName = spawn ("killall " ++ procName)
 runningProcessesCompl str = runningProcesses >>= 
@@ -685,7 +692,7 @@ comTA = do
         initMailLog
         initMail
         where
-            restartIMAP = spawn "restart-offlineimap"
+            restartIMAP = spawn "mail-restart"
             initMail    = raiseMaybe (runInTerm "-title mail" "mutt") (title =? "mail")
             initMailLog = raiseMaybe (runInTerm "-title maillog" "tail -F ~/.offlineimaplog") (title =? "maillog")
 
@@ -697,127 +704,20 @@ comTA = do
 -- per-workspace layout choices.
 
 myStartupHook = do
-    initCompositor
-    initStatusBar
-    initSystemTray
-    initAudioTray
-    initNotifier
-    initTerminal
-    initMiscApps
-    spawn "bloop up"
+    spawn "~/bin/xmode &>/dev/null &"
 
-quitXmonad = do
-    io (exitWith ExitSuccess)
+quitXmonad = io (exitWith ExitSuccess)
 
 rebuildXmonad :: X ()
-rebuildXmonad = spawn "xmonad --recompile && xmonad --restart"
+rebuildXmonad = do
+    spawn "xmonad --recompile && xmonad --restart"
 
 restartXmonad :: X ()
 restartXmonad = do
-    killAudioTray
-    killSystemTray
-    killStatusBar
-    killCompositor
-    killNotifier
     spawn "xmonad --restart"
 
 unspawn :: String -> X ()
 unspawn p = spawn $ "for pid in $(pgrep " ++ p ++ "); do kill -9 $pid; done" 
-
-initStalonetray :: X ()
-initStalonetray = spawn
-    $  " pgrep stalonetray || stalonetray"
-    ++ " --dockapp-mode none"
-    ++ " --background '#073642'"
-    ++ " --icon-size 18"
-    ++ " --slot-size 20"
-    -- ++ " --sticky"
-    ++ " --window-strut auto"
-    ++ " --window-type dock"
-    ++ " --geometry 6x1-1+0"
-    ++ " --max-geometry 6x1"
-    ++ " --icon-gravity W" -- NE"
-    ++ " --grow-gravity W"
-    ++ " --kludges fix_window_pos,force_icons_size" -- ,use_icon_hints"
-    ++ " --window-layer bottom"
-
-killStaloneTray :: X ()
-killStaloneTray = unspawn "stalonetray"
-
-initSystemTray :: X ()
-initSystemTray = spawn "systray"
-killSystemTray :: X ()
-killSystemTray = spawn "systray" -- systray just repositions, so we do this early
-
-initTrayer :: X ()
-initTrayer = spawn
-    $  " pgrep trayer || trayer"
-    ++ " --edge top"
-    ++ " --align right"
-    ++ " --SetDockType true"
-    ++ " --SetPartialStrut true"
-    ++ " --expand false"
-    ++ " --widthtype percent"
-    ++ " --width 6"
-    ++ " --tint 0x073642"
-    ++ " --transparent true"
-    ++ " --alpha 100" -- 0?
-    ++ " --margin 0"
-    ++ " --padding 0"
-    ++ " --heighttype pixel"
-    ++ " --height 20"
-
-killTrayer :: X ()
-killTrayer = unspawn "trayer"
-
-initCompositor :: X ()
-initCompositor = spawn
-    $  " pgrep compton || compton -f -D 6 -m 0.95 -cCGz" -- add for shadows: "-cCG"
-    ++ " --vsync drm"
-    ++ " --unredir-if-possible"
-    ++ " --detect-transient"
-    ++ " --detect-client-leader"
-    ++ " --paint-on-overlay"
-    -- ++ " --blur-background-fixed"
-    -- ++ " --use-ewmh-active-win"
-    -- or: "xcompmgr -f -D 6" "cairo-compmgr"
-
-killCompositor :: X ()
-killCompositor = unspawn "compton"
-
-
-initNotifier :: X ()
-initNotifier = spawn "pgrep dunst || dunst"
-
-killNotifier :: X ()
-killNotifier = unspawn "dunst"
-
-
-initStatusBar :: X ()
-initStatusBar = spawn "pgrep xmobar || xmobar ~/etc/xorg/.xmobarrc-minimal"
-
-killStatusBar :: X ()
-killStatusBar = return () -- unspawn "xmobar"
-
-initAudioTray :: X ()
-initAudioTray = spawn   "pgrep pasystray || pasystray &"
-
-killAudioTray :: X ()
-killAudioTray = unspawn "pasystray"
-
-runIfNot :: String -> String -> X ()
-runIfNot c e = spawn $ "pgrep " ++ c ++ " || " ++ e
-
-initMiscApps = do
-    runIfNot "zim" "zim --plugin trayicon"
-    runIfNot "dropbox" "dropboxd &"
-    runIfNot "xscreensaver" "/usr/bin/xscreensaver -no-splash -no-capture-stderr &"
-
-initWallpaper :: X ()
-initWallpaper = spawn   "~/bin/live"
-
-initFileManager :: X ()
-initFileManager = spawn "pgrep spacefm || spacefm -d"
 
 flash :: String -> X ()
 flash s = spawn $ "flash "++ s
@@ -947,6 +847,7 @@ myTopics =
     ["com"
     ,"des"
     ,"gen"
+    ,"img"
     ,"irc"
     ,"org"
     ,"pro"
@@ -1020,15 +921,54 @@ promptedShift = workspacePrompt myPromptConfig $ windows . W.shift
 -- To match on the WM_NAME, you can use 'title' in the same way that
 -- 'className' and 'resource' are used below.
 
-myManageHook = composeAll
-    [ transience'
-    , className =? "MPlayer"        --> doFloat
-    , className =? "Gimp"           --> doFloat
-    , resource  =? "desktop_window" --> doIgnore
-    , resource  =? "kdesktop"       --> doIgnore
-    , isDialog                      --> doFloat ]
-    <+> insertPosition Below Newer
-    <+> manageDocks
-    <+> namedScratchpadManageHook myScratchpads
+-- cf https://github.com/darvein/xmonad-config/blob/master/xmonad.hs
+
+myManageHook =
+              composeAll
+              [ className =? "MPlayer"        --> doFloat
+              , checkDock --> doIgnore
+              ]
+
+              <+>
+
+              composeOne
+              [ transience
+              , className =? "Firefox"        -?> doF (W.shift "web")
+              , title =? "Adobe Photoshop"    -?> viewShift "img"
+              ]
+
+              <+> manageDocks
+              <+> namedScratchpadManageHook myScratchpads
+
+              where
+                  viewShift = doF . liftM2 (.) W.greedyView W.shift
+
+-- composeAll
+--     -- transience' seems to also cause havoc
+--     -- [ transience'
+--     --
+--     -- isDialog doIgnore and doFloat seem similar with zim...?
+--     [ isDialog                      --> doFloat
+--     , transience
+--     -- , isDialog                      --> unFloat
+--     -- , resource =? "Dialog"          --> unFloat
+--     , className =? "MPlayer"        --> doFloat
+--     , className =? "Gimp"           --> doFloat
+--     , resource  =? "desktop_window" --> doIgnore
+--     , resource  =? "kdesktop"       --> doIgnore
+--     , title =? "Adobe Photoshop" --> viewShift "img"
+--     , title =? "Open" --> doCenterFloat
+--     ]
+--     -- these are useful but they conflict with transient dialogs
+--     -- <+> insertPosition Below Newer
+--     -- <+> insertPosition End Newer
+--     <+> manageDocks
+--     <+> namedScratchpadManageHook myScratchpads
+--         where
+--             role = stringProperty "WM_WINDOW_ROLE"
+--             isNormal :: Query Bool
+--             isNormal = isInProperty "_NET_WM_WINDOW_TYPE" "_NET_WM_WINDOW_TYPE_NORMAL"
+--             unFloat = ask >>= doF . W.sink
+--             viewShift = doF . liftM2 (.) W.greedyView W.shift
 
 -------------------------------------------------------------------- }}}

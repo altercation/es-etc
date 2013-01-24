@@ -9,15 +9,14 @@
 
 metadata = ~/var/mail/offlineimap
 accounts = es
-maxsyncaccounts = 2
-#ui = blinkenlights
+# ORIG - maxsyncaccounts = 2
+maxsyncaccounts = 5
 ui = TTYUI
-#ui = basic
-#ui = quiet
-#pythonfile = ~/etc/mail/offlineimap.py
+pythonfile = ~/etc/mail/offlineimap.py
 socktimeout = 60
 # skip forced fsyncing; higher performance, higher risk
 fsync = false
+ignore-readonly = yes
 
 # ---------------------------------------------------------------------
 # Mailbox name recorder
@@ -45,6 +44,10 @@ remoterepository = esremote
 autorefresh = 5
 quick = 10
 status_backend = sqlite
+postsynchook = ~/etc/mail/postsynchook.sh
+#    notmuch new; \
+#    notmuch tag -new -- tag:new and from:es@ethanschoonover.com; \
+#    notmuch tag +inbox +unread -new -- tag:new;
 # presynchook = imapfilter -c someotherconfig.lua
 # postsynchook = notifysync.sh
 # maxsize = 2000000
@@ -60,7 +63,7 @@ type               = Maildir
 localfolders       = ~/var/mail/accounts/es
 sep                = /
 nametrans          = lambda foldername: \
-                     re.sub('inbox',    'INBOX',
+                     re.sub('INBOX',    'INBOX',
                      re.sub('archive',  '[Gmail]/All Mail',
                      re.sub('chats',    '[Gmail]/Chats',
                      re.sub('drafts',   '[Gmail]/Drafts',
@@ -83,7 +86,8 @@ type               = Gmail
 cert_fingerprint   = 6d1b5b5ee0180ab493b71d3b94534b5ab937d042
 remoteuser         = es@ethanschoonover.com
 #password sourced from netrc
-maxconnections     = 3
+# ORIG maxconnections     = 3
+maxconnections     = 5
 holdconnectionopen = yes
 keepalive          = 30
 readonly           = False
@@ -94,18 +98,13 @@ createfolders      = True
 trashfolder        = [Gmail]/Trash
 spamfolder         = [Gmail]/Spam
 #foldersort        = lambda x, y: -cmp(x, y)
-#foldersort        = mycmp
+foldersort         = mycmp
 #folderincludes    = ['example.mailbox', 'example.override']
-#folderfilter      = lambda foldername:    foldername not in [
-#folderfilter       = lambda foldername:    foldername in [
-#                                           'INBOX',
-#                                           '[Gmail]/Trash',
-#                                           'test']
 folderfilter       = lambda foldername:    foldername not in [
-                                           '[Gmail]/All Mail',
+                                           'nullexclude',
                                            '[Gmail]/Chats']
 nametrans          = lambda foldername:  \
-                     re.sub('INBOX',             'inbox',
+                     re.sub('INBOX',     'INBOX',
                      re.sub('All Mail',  'archive',
                      re.sub('Chats',     'chats',
                      re.sub('Drafts',    'drafts',
@@ -114,18 +113,9 @@ nametrans          = lambda foldername:  \
                      re.sub('Sent Mail', 'sent',
                      re.sub('Spam',      'spam',
                      re.sub('Trash',     'trash',
+                     re.sub('bulk',      'bulk',
+                     re.sub('notifications',  'notifications',
+                     re.sub('social-updates', 'social-updates',
+                     re.sub('lists',     'lists',
                      re.sub('^\[Gmail\].', '',
-                     foldername))))))))))
-
-
-# old nametrans with case conversion. not a good idea due to inability
-# to map back to proper case on server write
-#nametrans          = lambda foldername:  \
-#                     re.sub('^\[gmail\].', '',
-#                     re.sub('all_mail',    'archive',
-#                     re.sub('starred',     'flagged',
-#                     re.sub('important',   'priority',
-#                     re.sub('sent_mail',   'sent',
-#                     re.sub(' ',           '_', 
-#                     foldername.lower()
-#                     ))))))
+                     foldername))))))))))))))
